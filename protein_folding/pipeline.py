@@ -31,10 +31,6 @@ def main():
     options.view_as(pipeline_options.WorkerOptions).max_num_workers = 20
     options.view_as(pipeline_options.WorkerOptions).sdk_container_image="gcr.io/shaker-388116/structure-import:live"
 
-    #alphafold_retrieval.DownloadProteinStructures(
-    #    entries,
-    #    "gs://high-confidence-protein-files/structures2/data",
-    #    runners.DataflowRunner(), options)
     alphafold_retrieval.DownloadTrainingExamples(
         entries,
         "gs://unreplicated-training-data/training_examples/data",
