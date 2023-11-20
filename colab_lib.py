@@ -11,7 +11,6 @@ import io as ior
 from avro import io
 import math
 import numpy as np
-import optuna
 from sklearn import neighbors
 import keras_tuner as kt
 import tensorflow as tf
