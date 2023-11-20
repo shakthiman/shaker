@@ -188,7 +188,7 @@ class EncoderTrain(object):
 
     def save(self, location):
       self._model.save(location, overwrite=True, save_format='tf',
-          options=tf.saved_model.SaveOptions())[
+          options=tf.saved_model.SaveOptions())
 
 def CondModel():
   residue_names = tf.keras.Input(shape=(None,), name='residue_names')
