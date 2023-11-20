@@ -13,7 +13,6 @@ import math
 import numpy as np
 from sklearn import neighbors
 import tensorflow as tf
-import tensorflow_io as tfio
 import tensorflow_probability as tfp
 import random
 import sys
