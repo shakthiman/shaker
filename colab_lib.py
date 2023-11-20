@@ -18,8 +18,6 @@ import random
 import sys
 import time
 
-from Bio import PDB
-import nglview
 tfd = tfp.distributions
 
 def GetStaticVocab(vocab):
