@@ -24,11 +24,11 @@ with tf.device('/CPU:0'):
 raw_tf_examples = tf.data.TFRecordDataset(
     ['gs://unreplicated-training-data/training_examples/data-{0}-of-00037.tfrecord'.format(str(i).zfill(5))
     for i in range(37)])
-    feature_spec = {
-        'name': tf.io.FixedLenFeature([], tf.string, default_value=''),
-        'residue_names': tf.io.FixedLenFeature([], tf.string, default_value=''),
-        'atom_names': tf.io.FixedLenFeature([], tf.string, default_value=''),
-        'normalized_coordinates': tf.io.FixedLenFeature([], tf.string, default_value='')}
+feature_spec = {
+  'name': tf.io.FixedLenFeature([], tf.string, default_value=''),
+  'residue_names': tf.io.FixedLenFeature([], tf.string, default_value=''),
+  'atom_names': tf.io.FixedLenFeature([], tf.string, default_value=''),
+  'normalized_coordinates': tf.io.FixedLenFeature([], tf.string, default_value='')}
 
 
 def _ConvertToFeatures(
