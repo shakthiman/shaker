@@ -355,6 +355,9 @@ class DiffusionModel:
   def gamma(self, ts):
     return self._gamma_module.GetGamma(ts)
 
+  def gamma_scalar(self, ts):
+    return tf.squeeze(self.gamma(tf.expand_dims(ts, -1)), -1)
+
   def sigma2(self, gamma):
     return tf.math.sigmoid(-1*gamma)
 
@@ -461,8 +464,8 @@ class DiffusionModel:
     t =  tf.cast((T - i) / T, 'float32')
     s = tf.cast((T - i - 1) / T, 'float32')
 
-    g_s = self.gamma(s)
-    g_t = self.gamma(t)
+    g_s = self.gamma_scalar(s)
+    g_t = self.gamma_scalar(t)
     sigma2_t = self.sigma2(g_t)
     sigma2_s = self.sigma2(g_s)
 
@@ -495,7 +498,7 @@ class DiffusionModel:
     tn = math.ceil(t * T)
     t = tn / T
     print('t', t)
-    g_t = self.gamma(t)
+    g_t = self.gamma_scalar(t)
     eps  = tf.random.normal(tf.shape(z_0))
     print('true eps', eps)
     z_with_error = self.variance_preserving_map(z_0, g_t, eps)
@@ -510,7 +513,7 @@ class DiffusionModel:
       z_t = self.sample_step(tf.constant(i), T, z_t, cond)
 
     # Decode from the embedding space.
-    g0 = self.gamma(0)
+    g0 = self.gamma_scalar(0)
     z_0_rescaled = z_t /  self.alpha(g0)
     print('z_0', z_t)
     print('z_0_rescaled', z_0_rescaled)
