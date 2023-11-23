@@ -356,7 +356,7 @@ class DiffusionModel:
     return self._gamma_module.GetGamma(ts)
 
   def gamma_scalar(self, ts):
-    return tf.squeeze(self.gamma(tf.expand_dims(ts, -1)), -1)
+    return tf.squeeze(tf.squeeze(self.gamma(tf.expand_dims(tf.expand_dims(ts, -1), -1)), -1), -1)
 
   def sigma2(self, gamma):
     return tf.math.sigmoid(-1*gamma)
