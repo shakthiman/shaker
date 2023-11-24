@@ -574,3 +574,46 @@ def LoadDiffusionModel(location_prefix):
       EncoderTrain(tf.keras.models.load_model(location_prefix+'/encoder_model')),
       CondTrain(tf.keras.models.load_model(location_prefix+'/conditioner_model')),
       ScoreTrain(tf.keras.models.load_model(location_prefix+'/scorer_model')))
+
+def _PreProcessPDBStructure(pdb_structure):
+  residue_names = []
+  atom_names = []
+  coords = []
+  for r in pdb_structure.get_residues():
+    for a in r.get_atoms():
+      residue_names.append(r.get_resname())
+      atom_names.append(a.get_name())
+      coords.append(a.get_coord())
+  residue_names = np.array(residue_names)
+  atom_names = np.array(atom_names)
+  normalized_coordinates = np.array(coords)
+  normalized_coordinates -= np.mean(coords, 0)
+
+
+  return {
+    'name': pdb_structure.get_id(),
+    'residue_names': residue_names,
+    'atom_names': atom_names,
+    'normalized_coordinates': normalized_coordinates,
+  }
+
+def _FeaturesFromPreprocessedStructure(
+    preprocessed_structure, residue_names_preprocessor,
+    atom_names_preprocessor):
+  residue_names = residue_names_preprocessor.lookup(
+      tf.constant(preprocessed_structure['residue_names']))
+  atom_names = atom_names_preprocessor.lookup(
+      tf.constant(preprocessed_structure['atom_names']))
+  normalized_coordinates = tf.constant(
+      preprocessed_structure['normalized_coordinates'])
+  return {
+      'residue_names': tf.expand_dims(residue_names, 0),
+      'atom_names': tf.expand_dims(atom_names, 0),
+      'normalized_coordinates': tf.expand_dims(normalized_coordinates, 0)}
+
+def FeaturesFromStructure(
+    pdb_structure, residue_names_preprocessor, atom_names_preprocessor):
+  preprocessed_structure = _PreProcessPDBStructure(pdb_structure)
+  return _FeaturesFromPreprocessedStructure(
+      preprocessed_structure, residue_names_preprocessor,
+      atom_names_preprocessor)
