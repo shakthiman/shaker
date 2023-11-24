@@ -343,7 +343,7 @@ class GammaModule(tf.Module):
     return -1*(l1_t + self._l3(self._l2(self._l1(ts))))
 
 SampleStepWitness = namedtuple(
-        'SampleStepWitness', ['alpha', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error'])
+        'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error'])
 
 class DiffusionModel:
   def __init__(self, residue_lookup_size, atom_lookup_size,
@@ -493,12 +493,14 @@ class DiffusionModel:
     true_eps = self.perfect_score(z_t, z_0, g_t)
     wt = SampleStepWitness(
             alpha=alpha_t,
+            ts = t,
             sigma=sigma_t,
             gamma_t=g_t,
             gamma_s=g_s,
             eps_avg_mag=tf.math.reduce_sum(tf.math.abs(true_eps)),
             eps_relative_error=tf.math.reduce_sum(tf.math.abs(eps_hat_cond-true_eps))/
-                               tf.math.reduce_sum(tf.math.abs(true_eps)))
+                               tf.math.reduce_sum(tf.math.abs(true_eps)),
+            error=tf.norm(z_s-z_0))
     return z_s, wt
 
   def reconstruct(self, t, training_data):
