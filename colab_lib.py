@@ -343,7 +343,7 @@ class GammaModule(tf.Module):
     return -1*(l1_t + self._l3(self._l2(self._l1(ts))))
 
 SampleStepWitness = namedtuple(
-        'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error'])
+        'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error', 'log_prob'])
 
 class DiffusionModel:
   def __init__(self, residue_lookup_size, atom_lookup_size,
@@ -461,12 +461,12 @@ class DiffusionModel:
     loss_diff, loss_diff_mse = self.diffusion_loss(t, f, x_mask, cond, training)
     return (loss_diff, loss_klz, loss_recon, loss_diff_mse, recon_diff)
 
-  def perfect_score(self, z_t, z_0, gamma):
+  def perfect_score(self, z_t, f, gamma):
     a = self.alpha(gamma)
     var = self.sigma2(gamma)
-    return tf.divide(z_t - a*z_0, tf.math.sqrt(var))
+    return tf.divide(z_t - a*f, tf.math.sqrt(var))
 
-  def sample_step(self, i, T, z_t, cond, z_0):
+  def sample_step(self, i, T, z_t, cond, f):
     eps = tf.random.normal(tf.shape(z_t))
     eps = tf.zeros(tf.shape(z_t))
     t =  tf.cast((T - i) / T, 'float32')
@@ -490,7 +490,7 @@ class DiffusionModel:
 
     x = (z_t -sigma_t*eps_hat_cond)/self.alpha(g_t)
     z_s = (alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t)
-    true_eps = self.perfect_score(z_t, z_0, g_t)
+    true_eps = self.perfect_score(z_t, f, g_t)
     wt = SampleStepWitness(
             alpha=alpha_t,
             ts = t,
@@ -500,7 +500,8 @@ class DiffusionModel:
             eps_avg_mag=tf.math.reduce_sum(tf.math.abs(true_eps)),
             eps_relative_error=tf.math.reduce_sum(tf.math.abs(eps_hat_cond-true_eps))/
                                tf.math.reduce_sum(tf.math.abs(true_eps)),
-            error=tf.norm(z_s-z_0))
+            error=tf.norm(z_s/alpha_s - f),
+            log_prob=self.log_prob(f, z_s, g_s))
     return z_s, wt
 
   def reconstruct(self, t, training_data):
@@ -510,7 +511,7 @@ class DiffusionModel:
         training_data['residue_names'],
         training_data['atom_names'], training=False)
     # Encode x into the embedding space.
-    z_0 = self._encoder.encode(x, cond, training=False)
+    f = self._encoder.encode(x, cond, training=False)
 
     # Introduce the error.
     T = self._timesteps
@@ -518,10 +519,10 @@ class DiffusionModel:
     t = tn / T
     print('t', t)
     g_t = self.gamma_scalar(t)
-    eps  = tf.random.normal(tf.shape(z_0))
+    eps  = tf.random.normal(tf.shape(f))
     print('true eps', eps)
-    z_with_error = self.variance_preserving_map(z_0, g_t, eps)
-    print('z_0', z_0)
+    z_with_error = self.variance_preserving_map(f, g_t, eps)
+    print('f', f)
     z_t = z_with_error
     print('z_t', z_t)
 
@@ -530,7 +531,7 @@ class DiffusionModel:
     for i in range(T-tn, T):
       if i%100==0:
         print(i)
-      z_t, wt = self.sample_step(tf.constant(i), T, z_t, cond, z_0)
+      z_t, wt = self.sample_step(tf.constant(i), T, z_t, cond, f)
       witnesses.append(wt)
 
     # Decode from the embedding space.
@@ -540,7 +541,7 @@ class DiffusionModel:
     print('z_0_rescaled', z_0_rescaled)
     return (self._decoder.decode(z_with_error / self.alpha(g0), cond, training=False),
         self._decoder.decode(z_0_rescaled, cond, training=False),
-        z_0, z_with_error, z_t, witnesses)
+        f, z_with_error, z_t, witnesses)
 
   # Computes the diffusion loss at multiple timesteps.
   def MSEAtTimesteps(self, ts, training_data):
@@ -565,6 +566,15 @@ class DiffusionModel:
     self._conditioner.save(location + '/conditioner_model')
     self._scorer.save(location + '/scorer_model')
     tf.saved_model.save(self._gamma_module, location + '/gamma_module')
+
+  # Computes the PDF for sampling z at time t.
+  def log_prob(self, f, z_t, g_t):
+    alpha = self.alpha(g_t)
+    var = self.sigma2(g_t)
+
+    z_t_distribution = tfd.MultivariateNormalDiag(
+        loc=f*alpha, scale_diag=tf.math.sqrt(var)*tf.ones_like(f))
+    return tf.math.reduce_sum(z_t_distribution.log_prob(z_t))
 
 def LoadDiffusionModel(location_prefix):
   return DiffusionModel(
