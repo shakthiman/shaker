@@ -468,7 +468,6 @@ class DiffusionModel:
 
   def sample_step(self, i, T, z_t, cond, f):
     eps = tf.random.normal(tf.shape(z_t))
-    eps = tf.zeros(tf.shape(z_t))
     t =  tf.cast((T - i) / T, 'float32')
     s = tf.cast((T - i - 1) / T, 'float32')
 
@@ -486,10 +485,13 @@ class DiffusionModel:
     alpha_t_s = alpha_t/alpha_s
     sigma2_t_s = sigma2_t - tf.math.square(alpha_t_s)*sigma2_s
 
+    sigma2_q = sigma2_t_s * sigma2_s / sigma2_t
+
     eps_hat_cond = self._scorer.score(z_t, g_t, cond, training=False)
 
     x = (z_t -sigma_t*eps_hat_cond)/self.alpha(g_t)
-    z_s = (alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t)
+    z_s = ((alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t) +
+            tf.math.sqrt(sigma2_q) * eps)
     true_eps = self.perfect_score(z_t, f, g_t)
     wt = SampleStepWitness(
             alpha=alpha_t,
