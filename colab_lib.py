@@ -466,6 +466,11 @@ class DiffusionModel:
     var = self.sigma2(gamma)
     return tf.divide(z_t - a*f, tf.math.sqrt(var))
 
+  def perfect_score_vec(self, z_t, f, gamma):
+    a = tf.expand_dims(tf.expand_dims(self.alpha(gamma), -1), -1)
+    var = tf.expand_dims(tf.expand_dims(self.sigma2(gamma), -1), -1)
+    return tf.divide(z_t - a*f, tf.math.sqrt(var))
+
   def sample_step_vec(self, t, s, z_t, cond, f):
     eps = tf.random.normal(tf.shape(z_t))
 
