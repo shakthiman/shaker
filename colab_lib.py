@@ -466,6 +466,30 @@ class DiffusionModel:
     var = self.sigma2(gamma)
     return tf.divide(z_t - a*f, tf.math.sqrt(var))
 
+  def sample_step_vec(self, t, s, z_t, cond, f):
+    eps = tf.random.normal(tf.shape(z_t))
+
+    g_s = tf.squeeze(self.gamma(tf.expand_dims(s, -1)), -1)
+    g_t = tf.squeeze(self.gamma(tf.expand_dims(t, -1)), -1)
+    sigma2_t = self.sigma2(g_t)
+    sigma2_s = self.sigma2(g_s)
+
+    sigma_t = tf.math.sqrt(sigma2_t)
+    sigma_s = tf.math.sqrt(sigma2_s)
+
+    alpha_t = self.alpha(g_t)
+    alpha_s = self.alpha(g_s)
+
+    alpha_t_s = alpha_t / alpha_s
+    sigma2_t_s = sigma2_t - tf.math.square(alpha_t_s)*sigma2_s
+
+    sigma2_q = sigma2_t_s * sigma2_s / sigma2_t
+    eps_hat_cond = self._scorer.score(z_t, g_t, cond, training=False)
+    x = (z_t -sigma_t*eps_hat_cond)/self.alpha(g_t)
+    z_s = ((alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t) +
+            tf.math.sqrt(sigma2_q) * eps)
+    return z_s
+
   def sample_step(self, i, T, z_t, cond, f):
     eps = tf.random.normal(tf.shape(z_t))
     t =  tf.cast((T - i) / T, 'float32')
