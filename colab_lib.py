@@ -206,12 +206,12 @@ class EncoderTrain(object):
       'cond': cond}, training=training)
     return to_return
 
-    def trainable_weights(self):
-      return self._model.trainable_weights
+  def trainable_weights(self):
+    return self._model.trainable_weights
 
-    def save(self, location):
-      self._model.save(location, overwrite=True, save_format='tf',
-          options=tf.saved_model.SaveOptions())
+  def save(self, location):
+    self._model.save(location, overwrite=True, save_format='tf',
+            options=tf.saved_model.SaveOptions())
 
 def CondModel():
   residue_names = tf.keras.Input(shape=(None,), name='residue_names')
