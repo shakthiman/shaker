@@ -574,6 +574,30 @@ class DiffusionModel:
         self._decoder.decode(z_0_rescaled, cond, training=False),
         f, z_with_error, z_t, witnesses)
 
+  def generate(self, training_data):
+    z_t = tf.random.normal((1, Z_EMBEDDING_SIZE))
+
+    # Compute f to understand errors during the reverse process.
+    x = training_data['normalized_coordinates']
+    cond = self._conditioner.conditioning(
+        training_data['residue_names'],
+        training_data['atom_names'], training=False)
+    f = self._encoder.encode(x, cond, training=False)
+
+    # Remove the error.
+    T = self._timesteps
+    witnesses = []
+    for i in range(T):
+      if i%100==0:
+        print(i)
+      z_t, wt = self.sample_step(tf.constant(i), T, z_t, cond, f)
+      witnesses.append(wt)
+
+    # Decode from the embedding space
+    g0 = self.gamma_scalar(0)
+    z_0_rescaled = z_t / self.alpha(g0)
+    return (self._decoder.decode(z_0_rescaled, cond, training=False), witnesses)
+
   # Computes the diffusion loss at multiple timesteps.
   def MSEAtTimesteps(self, ts, training_data):
     x = training_data['normalized_coordinates']
