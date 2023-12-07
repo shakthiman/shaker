@@ -575,7 +575,7 @@ class DiffusionModel:
         f, z_with_error, z_t, witnesses)
 
   def generate(self, training_data):
-    z_t = tf.random.normal((1, Z_EMBEDDING_SIZE))
+    z_t = tf.random.normal((1, tf.shape(training_data['normalized_coordinates'])[1], Z_EMBEDDING_SIZE))
 
     # Compute f to understand errors during the reverse process.
     x = training_data['normalized_coordinates']
