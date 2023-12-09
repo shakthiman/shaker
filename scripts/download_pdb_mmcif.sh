@@ -53,9 +53,14 @@ rsync --recursive --links --perms --times --compress --info=progress2 --delete -
   "${RAW_DIR}"
 
 echo "Unzip all mmCIF files..."
-for x in $(find "${RAW_DIR}/" -type f -iname "*.gz"); do
-  gunzip $x
-  x_noext="${x%.*}"
-  gsutil cp "${x_noext}.cif" gs://rcsb_download/
-  rm "${x_noext}.cif"
+find "${RAW_DIR}/" -type f -iname "*.gz" -exec gunzip {} +
+
+echo "Flattening all mmCIF files..."
+mkdir --parents "${MMCIF_DIR}"
+find "${RAW_DIR}" -type d -empty -delete # Delete empty directories.
+for subdir in "${RAW_DIR}"/*; do
+  mv "${subdir}/"*.cif "${MMCIF_DIR}"
 done
+
+echo "Copying files to the cloud"
+gsutil cp "${MMCIF_DIR}/*" gs://rcsb_download/
