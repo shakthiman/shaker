@@ -7,6 +7,11 @@ if ! command -v aria2c &> /dev/null ; then
   exit 1
 fi
 
+if ! command -v gsutil &> /dev/null ; then
+  echo "Error: gsutil could not be found. Please install gsutil."
+  exit 1
+fi
+
 DOWNLOAD_DIR="~"
 ROOT_DIR="${DOWNLOAD_DIR}/cluster_info"
 SOURCE_URL="https://cdn.rcsb.org/resources/sequence/clusters/clusters-by-entity-40.txt"
