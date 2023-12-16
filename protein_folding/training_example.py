@@ -107,11 +107,50 @@ def _ProteinOnlyFeatures(pdb_model):
       'resseq': tf.ragged.constant([ca['resseq'] for ca in atoms]),
       'icode': tf.ragged.constant([ca['icode'] for ca in atoms]),
       'atom_name': tf.ragged.constant([ca['atom_name'] for ca in atoms]),
-      'atom_coords': tf.ragged.constant([np.array(ca['atom_coords']) - center_of_mass/total_num_atoms for ca in atoms]),
+      'atom_coords': tf.ragged.constant(
+          [np.array(ca['atom_coords']) - center_of_mass/total_num_atoms for ca in atoms],
+          dtype=tf.float32),
   }
 
 def _BytesFeature(value):
-    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+  return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+
+def _BytesListFeature(value):
+  return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+
+def SerializeRaggedTensor(rt):
+  components = tf.nest.flatten(rt, expand_composites=True)
+  return tf.stack([tf.io.serialize_tensor(t) for t in components])
+
+def DeserializeRaggedTensor(serialized, type_spec):
+  component_specs = tf.nest.flatten(type_spec, expand_composites=True)
+  components = [
+      tf.io.parse_tensor(serialized[i], spec.dtype)
+      for i, spec in enumerate(component_specs)]
+  return tf.nest.pack_sequence_as(type_spec, components, expand_composites=True)
+
+def ProteinOnlyExamples(pdb_structure):
+  for m in pdb_structure.get_models():
+    features = _ProteinOnlyFeatures(m)
+    yield {
+        'structure_id': _BytesFeature(bytes(features['structure_id'], 'utf-8')),
+        'chain_ids': _BytesFeature(
+          tf.io.serialize_tensor(features['chain_ids']).numpy()),
+        'residue_seqid': _BytesListFeature(
+          SerializeRaggedTensor(features['residue_seqid']).numpy()),
+        'resname': _BytesListFeature(
+          SerializeRaggedTensor(features['resname']).numpy()),
+        'hetflag': _BytesListFeature(
+          SerializeRaggedTensor(features['hetflag']).numpy()),
+        'resseq': _BytesListFeature(
+          SerializeRaggedTensor(features['resseq']).numpy()),
+        'icode': _BytesListFeature(
+          SerializeRaggedTensor(features['icode']).numpy()),
+        'atom_name': _BytesListFeature(
+          SerializeRaggedTensor(features['atom_name']).numpy()),
+        'atom_coords': _BytesListFeature(
+          SerializeRaggedTensor(features['atom_coords']).numpy()),
+        }
 
 def SimpleExample(example):
     feature  ={'name': _BytesFeature(bytes(example['name'], 'utf-8')),
