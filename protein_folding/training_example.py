@@ -1,9 +1,9 @@
 import apache_beam as beam
+from Bio import PDB
 import collections
 import numpy as np
 import io
 import random
-from sklearn import neighbors
 
 import tensorflow as tf
 
@@ -43,6 +43,72 @@ def PreProcessPDBStructure(pdb_structure):
         'atom_names': atom_names,
         'normalized_coordinates': normalized_coordinates,
     }
+
+# Things to record:
+#  - Chain Id [List of Chain-ids]
+#  - Residue Id [Key by (Chain-idx, atom-idx)]
+#  - Residue Names [Key by (Chain-idx, atom-idx)]
+#  - Atom Names [Key by (Chain-idx, atom-idx)]
+#  - Atom Coordinates [Key by (Chain-idx, atom-idx, 3-dimension)]
+def _ProteinOnlyFeatures(pdb_model):
+  # Keyed by Chain-Idx
+  chain_ids = []
+  # Keyed by (Chain-idx, atom-idx)
+  atoms = []
+
+  # Used to compute the center of mass.
+  center_of_mass = np.zeros(3)
+  total_num_atoms = 0
+
+  for c in pdb_model.get_chains():
+    chain_ids.append(c.id)
+    residue_seqid =0
+    # Keyed by atom-idx
+    chain_atoms = {
+        'residue_seqid': [],
+        'resname': [],
+        'hetflag': [],
+        'resseq': [],
+        'icode': [],
+        'atom_name': [],
+        'atom_coords': []
+    }
+    for r in c.get_residues():
+      if not PDB.Polypeptide.is_aa(r):
+        # Ignore this residue. It's not an amino acid.
+        continue
+      residue_seqid += 1
+      resname = r.get_resname()
+      hetflag, resseq, icode = r.get_id()
+      residue_id = '{}-{}-{}'.format(hetflag, resseq, icode)
+      for a in r.get_atoms():
+        atom_name = a.get_name()
+        atom_coords = a.get_coord()
+        chain_atoms['residue_seqid'].append(residue_seqid)
+        chain_atoms['resname'].append(resname)
+        chain_atoms['hetflag'].append(hetflag)
+        chain_atoms['resseq'].append(resseq)
+        chain_atoms['icode'].append(icode)
+        chain_atoms['atom_name'].append(atom_name)
+        chain_atoms['atom_coords'].append(atom_coords)
+        center_of_mass += atom_coords
+        total_num_atoms += 1
+    atoms.append(chain_atoms)
+
+  if total_num_atoms==0:
+    return None
+
+  return {
+      'structure_id': pdb_model.get_full_id()[0],
+      'chain_ids': tf.constant(chain_ids),
+      'residue_seqid': tf.ragged.constant([ca['residue_seqid'] for ca in atoms]),
+      'resname': tf.ragged.constant([ca['resname'] for ca in atoms]),
+      'hetflag': tf.ragged.constant([ca['hetflag'] for ca in atoms]),
+      'resseq': tf.ragged.constant([ca['resseq'] for ca in atoms]),
+      'icode': tf.ragged.constant([ca['icode'] for ca in atoms]),
+      'atom_name': tf.ragged.constant([ca['atom_name'] for ca in atoms]),
+      'atom_coords': tf.ragged.constant([np.array(ca['atom_coords']) - center_of_mass/total_num_atoms for ca in atoms]),
+  }
 
 def _BytesFeature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
