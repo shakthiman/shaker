@@ -50,7 +50,7 @@ def PreProcessPDBStructure(pdb_structure):
 #  - Residue Names [Key by (Chain-idx, atom-idx)]
 #  - Atom Names [Key by (Chain-idx, atom-idx)]
 #  - Atom Coordinates [Key by (Chain-idx, atom-idx, 3-dimension)]
-def _ProteinOnlyFeatures(pdb_model):
+def ProteinOnlyFeatures(pdb_model):
   # Keyed by Chain-Idx
   chain_ids = []
   # Keyed by (Chain-idx, atom-idx)
@@ -100,16 +100,15 @@ def _ProteinOnlyFeatures(pdb_model):
 
   return {
       'structure_id': pdb_model.get_full_id()[0],
-      'chain_ids': tf.constant(chain_ids),
-      'residue_seqid': tf.ragged.constant([ca['residue_seqid'] for ca in atoms]),
-      'resname': tf.ragged.constant([ca['resname'] for ca in atoms]),
-      'hetflag': tf.ragged.constant([ca['hetflag'] for ca in atoms]),
-      'resseq': tf.ragged.constant([ca['resseq'] for ca in atoms]),
-      'icode': tf.ragged.constant([ca['icode'] for ca in atoms]),
-      'atom_name': tf.ragged.constant([ca['atom_name'] for ca in atoms]),
-      'atom_coords': tf.ragged.constant(
-          [np.array(ca['atom_coords']) - center_of_mass/total_num_atoms for ca in atoms],
-          dtype=tf.float32),
+      'chain_ids': chain_ids,
+      'residue_seqid': [np.array(ca['residue_seqid']) for ca in atoms],
+      'resname': [np.array(ca['resname']) for ca in atoms],
+      'hetflag': [np.array(ca['hetflag']) for ca in atoms],
+      'resseq': [np.array(ca['resseq']) for ca in atoms],
+      'icode': [np.array(ca['icode']) for ca in atoms],
+      'atom_name': [np.array(ca['atom_name']) for ca in atoms],
+      'atom_coords': [np.array(ca['atom_coords']) - center_of_mass/total_num_atoms
+        if len(ca['atom_coords'])>0 else np.array(ca['atom_coords']) for ca in atoms],
   }
 
 def _BytesFeature(value):
@@ -129,28 +128,27 @@ def DeserializeRaggedTensor(serialized, type_spec):
       for i, spec in enumerate(component_specs)]
   return tf.nest.pack_sequence_as(type_spec, components, expand_composites=True)
 
-def ProteinOnlyExamples(pdb_structure):
-  for m in pdb_structure.get_models():
-    features = _ProteinOnlyFeatures(m)
-    yield {
-        'structure_id': _BytesFeature(bytes(features['structure_id'], 'utf-8')),
-        'chain_ids': _BytesFeature(
-          tf.io.serialize_tensor(features['chain_ids']).numpy()),
-        'residue_seqid': _BytesListFeature(
-          SerializeRaggedTensor(features['residue_seqid']).numpy()),
-        'resname': _BytesListFeature(
-          SerializeRaggedTensor(features['resname']).numpy()),
-        'hetflag': _BytesListFeature(
-          SerializeRaggedTensor(features['hetflag']).numpy()),
-        'resseq': _BytesListFeature(
-          SerializeRaggedTensor(features['resseq']).numpy()),
-        'icode': _BytesListFeature(
-          SerializeRaggedTensor(features['icode']).numpy()),
-        'atom_name': _BytesListFeature(
-          SerializeRaggedTensor(features['atom_name']).numpy()),
-        'atom_coords': _BytesListFeature(
-          SerializeRaggedTensor(features['atom_coords']).numpy()),
-        }
+def ProteinOnlyExample(protein_only_features):
+  return tf.train.Example(features=tf.train.Features(feature={
+      'structure_id': _BytesFeature(bytes(protein_only_features['structure_id'], 'utf-8')),
+      'chain_ids': _BytesFeature(
+        tf.io.serialize_tensor(tf.constant(protein_only_features['chain_ids'])).numpy()),
+      'residue_seqid': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(protein_only_features['residue_seqid'])).numpy()),
+      'resname': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(protein_only_features['resname'])).numpy()),
+      'hetflag': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(protein_only_features['hetflag'])).numpy()),
+      'resseq': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(protein_only_features['resseq'])).numpy()),
+      'icode': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(protein_only_features['icode'])).numpy()),
+      'atom_name': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(protein_only_features['atom_name'])).numpy()),
+      'atom_coords': _BytesListFeature(
+        SerializeRaggedTensor(tf.ragged.constant(
+            protein_only_features['atom_coords'], dtype=tf.float32)).numpy()),
+      })).SerializeToString()
 
 def SimpleExample(example):
     feature  ={'name': _BytesFeature(bytes(example['name'], 'utf-8')),
@@ -170,6 +168,27 @@ class GetTrainingSummariesFn(beam.CombineFn):
     def add_input(self, accumulator, input):
       accumulator[0].update(input['residue_names'])
       accumulator[1].update(input['atom_names'])
+      return accumulator
+
+    def merge_accumulators(self, accumulators):
+        return(set.union(
+            *(accumulator[0] for accumulator in accumulators)),
+            set.union(
+                *(accumulator[1] for accumulator in accumulators)))
+
+    def extract_output(self, accumulator):
+        return {'residue_names': list(accumulator[0]),
+                'atom_names': list(accumulator[1])}
+
+class GetProteinOnlyTrainingSummariesFn(beam.CombineFn):
+    def create_accumulator(self):
+        return (set(),set())
+    
+    def add_input(self, accumulator, input):
+      for r in input['resname']:
+        accumulator[0].update(r.astype(str))
+      for a in input['atom_name']:
+        accumulator[1].update(a.astype(str))
       return accumulator
 
     def merge_accumulators(self, accumulators):

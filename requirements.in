@@ -1,0 +1,6 @@
+wheel
+apache-beam[gcp]
+biopython
+google-cloud-storage
+tensorflow
+python-snappy

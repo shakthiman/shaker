@@ -8,9 +8,9 @@ class LigandCheck(object):
     for r in lig_pairs_file_handler:
       parts = r.strip().split(':')
       if len(parts) == 2:
-        self.pdbs_with_ligands.add(parts[0].strip())
+        self.pdbs_with_ligands.add(parts[0].strip().upper())
       else:
         raise Exception('A pdb with no ligands')
 
   def HasLigands(self, pdb_id):
-    return pdb_id in self.pdbs_with_ligands
+    return pdb_id.upper() in self.pdbs_with_ligands
