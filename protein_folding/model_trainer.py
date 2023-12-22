@@ -1,21 +1,21 @@
 import tensorflow as tf
 
 @tf.function(reduce_retracing=True)
-def _SingleChainTrainStep(training_data, model):
+def _SingleChainTrainStep(training_data, model, optimizer):
   with tf.GradientTape() as tape:
     l1, l2, l3, loss_diff_mse, recon_diff = model.compute_model_loss(
         training_data)
     loss = tf.reduce_mean(l1+l2+l3)
   trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
-  optimizer.apply_gradient(zip(grads, trainable_weights))
+  optimizer.apply_gradients(zip(grads, trainable_weights))
   return (
       tf.reduce_mean(l1), tf.reduce_mean(l2), tf.reduce_mean(l3),
       tf.reduce_mean(loss_diff_mse), recon_diff)
 
-def TrainSingleChainModel(train_ds,
-    shuffle_size, batch_size, prefetch_size, model):
-  train_ds.shuffle(shuffle_size).map(
+def TrainSingleChainModel(ds,
+    shuffle_size, batch_size, prefetch_size, model, optimizer):
+  tds = ds.shuffle(shuffle_size).map(
       lambda x:{
         'residue_names': x['resname'].to_tensor()[0],
         'atom_names': x['atom_name'].to_tensor()[0],
@@ -27,8 +27,9 @@ def TrainSingleChainModel(train_ds,
               'atom_names': [None],
               'normalized_coordinates': [None, 3],
               }).prefetch(10)
-  for step, training_data in train_ds.enumerate():
-    l1, l2, l3, loss_diff_mse, recon_diff = train_step(training_data)
+  for step, training_data in tds.enumerate():
+    l1, l2, l3, loss_diff_mse, recon_diff = _SingleChainTrainStep(
+            training_data, model, optimizer)
     if step % 10==0:
       #print("Training Loss (for one batch) at step %d: %.4f"
       #  % (step, float(tf.reduce_mean(l1+l2+l3))))
