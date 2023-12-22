@@ -14,11 +14,11 @@ def _SingleChainTrainStep(training_data, model, optimizer):
       tf.reduce_mean(loss_diff_mse), recon_diff)
 
 def TrainSingleChainModel(ds,
-    shuffle_size, batch_size, prefetch_size, model, optimizer):
+    shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer):
   tds = ds.shuffle(shuffle_size).map(
       lambda x:{
-        'residue_names': x['resname'].to_tensor()[0],
-        'atom_names': x['atom_name'].to_tensor()[0],
+        'residue_names': pdb_vocab.GetResidueNamesId(x['resname'].to_tensor()[0]),
+        'atom_names': pdb_vocab.GetAtomNamesId(x['atom_name'].to_tensor()[0]),
         'normalized_coordinates': x['atom_coords'].to_tensor()[0]
         }).padded_batch(
             batch_size,
