@@ -1,6 +1,7 @@
 from google.cloud import storage
-
 import tensorflow as tf
+
+from protein_folding import training_example
 
 def GetTFExamples(project, bucket, blob_prefix):
   client = storage.Client(project)
@@ -18,4 +19,4 @@ def GetTFExamples(project, bucket, blob_prefix):
   for cluster, files in files_by_cluster.items():
     raw_datasets.append(tf.data.TFRecordDataset(files))
 
-  return tf.data.Dataset.sample_from_datasets(raw_datasets)
+  return tf.data.Dataset.sample_from_datasets(raw_datasets).map(training_example.ParseProteinOnlyExample)

@@ -150,6 +150,24 @@ def ProteinOnlyExample(protein_only_features):
             protein_only_features['atom_coords'], dtype=tf.float32)).numpy()),
       })).SerializeToString()
 
+_PROTEIN_ONLY_FEATURE_SPEC = {
+    'structure_id': tf.io.FixedLenFeature([], tf.string, default_value=''),
+    'resname': tf.io.FixedLenFeature([2], tf.string),
+    'atom_name': tf.io.FixedLenFeature([2], tf.string),
+    'atom_coords': tf.io.FixedLenFeature([3], tf.string)
+    }
+
+def ParseProteinOnlyExample(serialized_example):
+  parsed_example = tf.io.parse_single_example(serialized_example, _PROTEIN_ONLY_FEATURE_SPEC)
+  return {
+      'structure_id': parsed_example['structure_id'],
+      'resname': DeserializeRaggedTensor(parsed_example['resname'],
+        tf.RaggedTensorSpec(dtype=tf.dtypes.string, ragged_rank=1)),
+      'atom_name': DeserializeRaggedTensor(parsed_example['atom_name'],
+        tf.RaggedTensorSpec(dtype=tf.dtypes.string, ragged_rank=1)),
+      'atom_coords': DeserializeRaggedTensor(parsed_example['atom_coords'],
+        tf.RaggedTensorSpec(dtype=tf.dtypes.float32, ragged_rank=2))}
+
 def SimpleExample(example):
     feature  ={'name': _BytesFeature(bytes(example['name'], 'utf-8')),
             'residue_names': _BytesFeature(
