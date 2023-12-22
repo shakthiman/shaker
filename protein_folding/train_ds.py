@@ -17,6 +17,6 @@ def GetTFExamples(project, bucket, blob_prefix):
 
   raw_datasets = []
   for cluster, files in files_by_cluster.items():
-    raw_datasets.append(tf.data.TFRecordDataset(files))
+    raw_datasets.append(tf.data.TFRecordDataset(files).repeat())
 
   return tf.data.Dataset.sample_from_datasets(raw_datasets).map(training_example.ParseProteinOnlyExample)
