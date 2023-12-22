@@ -17,9 +17,9 @@ def TrainSingleChainModel(train_ds,
     shuffle_size, batch_size, prefetch_size, model):
   train_ds.shuffle(shuffle_size).map(
       lambda x:{
-        'residue_names': x['resname'][0],
-        'atom_names': x['atom_name'][0],
-        'normalized_coordinates': x['atom_coords'][0]
+        'residue_names': x['resname'].to_tensor()[0],
+        'atom_names': x['atom_name'].to_tensor()[0],
+        'normalized_coordinates': x['atom_coords'].to_tensor()[0]
         }).padded_batch(
             batch_size,
             padded_shapes={
