@@ -14,7 +14,8 @@ def _SingleChainTrainStep(training_data, model, optimizer):
       tf.reduce_mean(loss_diff_mse), recon_diff)
 
 def TrainSingleChainModel(ds,
-    shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer):
+    shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer,
+    write_target):
   tds = ds.shuffle(shuffle_size).map(
       lambda x:{
         'residue_names': pdb_vocab.GetResidueNamesId(x['resname'].to_tensor()[0]),
@@ -47,3 +48,5 @@ def TrainSingleChainModel(ds,
       #print("l2: ", l2)
       #print("l3: ", l3)
       print("Seen so far: %s samples" % ((step + 1) * batch_size))
+    if step % 200==0:
+      model.save('{}/version_{}'.format(write_target, step))
