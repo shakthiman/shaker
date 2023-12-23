@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 from protein_folding import diffusion_model
 
 # Constants
