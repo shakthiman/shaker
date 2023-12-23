@@ -213,7 +213,7 @@ class EncoderTrain(object):
     self._model.save(location, overwrite=True, save_format='tf',
             options=tf.saved_model.SaveOptions())
 
-def CondModel():
+def CondModel(residue_lookup_size, atom_lookup_size):
   residue_names = tf.keras.Input(shape=(None,), name='residue_names')
   atom_names = tf.keras.Input(shape=(None,), name='atom_names')
 
