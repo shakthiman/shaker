@@ -131,8 +131,19 @@ def ScoreModel():
   concatenated_features = tf.keras.layers.concatenate(
       inputs=[base_features, score_convolve_layer(base_features)])
 
-  transformer_output = TransformerLayer(1, 5, 5, 161, concatenated_features)
-  score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(transformer_output)
+  # Reduce, Attend, and Upsample.
+  sequence_size = tf.shape(concatenated_features)[1]
+  ideal_sequence_size = tf.math.ceil(tf.cast(sequence_size, tf.float32)/10)*10
+  paddings = tf.constant([[0, 0],[0, ideal_sequence_size-sequence_size],[0, 0]])
+  padded_features = tf.pad(concatenated_features, paddings)
+  reduced_features = tf.keras.layers.SeparableConv1D(
+      64, 10, padding='same')(padded_features)
+  reduced_features  = tf.keras.layers.AveragePooling1D(10, padding='same')(reduced_features)
+  transformer_output = TransformerLayer(1, 5, 5, 161, reduced_features)
+  upsampled_transformer_output = tf.keras.layers.UpSampling1D(10, padding='same')
+
+  score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
+      inputs=[concatenated_features, upsampled_transformer_output[:,:sequence_size,:]]))
 
   return tf.keras.Model(inputs=[z, gamma, cond], outputs=score)
 
