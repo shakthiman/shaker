@@ -134,7 +134,9 @@ def ScoreModel():
   # Reduce, Attend, and Upsample.
   sequence_size = tf.shape(concatenated_features)[1]
   ideal_sequence_size = tf.cast(tf.math.ceil(tf.cast(sequence_size, tf.float32)/10)*10, tf.int32)
-  paddings = tf.constant([[0, 0],[0, ideal_sequence_size-sequence_size],[0, 0]])
+  paddings = tf.stack([tf.constant([0, 0])
+                       tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
+                       tf.constant([0, 0])])
   padded_features = tf.pad(concatenated_features, paddings)
   reduced_features = tf.keras.layers.SeparableConv1D(
       64, 10, padding='same')(padded_features)
