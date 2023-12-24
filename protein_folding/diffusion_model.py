@@ -30,8 +30,8 @@ class DecoderTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf',
-        options=tf.saved_model.SaveOptions())
+    self._model.save_weights(location, overwrite=True, save_format='tf',
+        options=tf.train.CheckpointOptions(enable_async=True))
 
 class EncoderTrain(object):
   def __init__(self, model):
@@ -56,8 +56,8 @@ class EncoderTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf',
-            options=tf.saved_model.SaveOptions())
+    self._model.save_weights(location, overwrite=True, save_format='tf',
+            options=tf.train.CheckpointOptions(enable_async=True))
 
 class CondTrain(object):
   def __init__(self, model):
@@ -80,9 +80,9 @@ class CondTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(
+    self._model.save_weights(
       location, overwrite=True, save_format='tf',
-      options=tf.saved_model.SaveOptions())
+      options=tf.train.CheckpointOptions(enable_async=True))
 
 class ScoreTrain(object):
   def __init__(self, model):
@@ -109,7 +109,7 @@ class ScoreTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf', options=tf.saved_model.SaveOptions())
+    self._model.save_weights(location, overwrite=True, save_format='tf', options=tf.train.CheckpointOptions(enable_async=True))
 
 SampleStepWitness = namedtuple(
         'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error', 'log_prob'])
