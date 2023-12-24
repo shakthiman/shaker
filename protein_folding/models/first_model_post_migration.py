@@ -54,10 +54,9 @@ def DecoderModel():
     z_0_rescaled, cond, pemb])
   convolved_inputs = tf.keras.layers.Conv1DTranspose(32, ENCODER_CONVOLVE_SIZE, padding='same')(base_inputs)
   concatenated_inputs = tf.keras.layers.concatenate(inputs=[base_inputs, convolved_inputs])
-  transformer_output = TransformerLayer(1, 5, 5, 119, concatenated_inputs)
 
   scale_diag = tf.Variable(1.0)
-  loc = tf.keras.layers.Dense(3)(tf.keras.layers.Dense(100, 'gelu')(tf.keras.layers.Dense(100, 'gelu')(transformer_output)))
+  loc = tf.keras.layers.Dense(3)(tf.keras.layers.Dense(100, 'gelu')(tf.keras.layers.Dense(100, 'gelu')(concatenated_inputs)))
   return tf.keras.Model(
       inputs=[z_0_rescaled, cond],
       outputs=[loc, tf.keras.layers.Identity()(scale_diag*tf.ones_like(loc))])
@@ -77,12 +76,10 @@ def EncoderModel():
       32, ENCODER_CONVOLVE_SIZE, activation='gelu', padding='same')(encoded_coordinates)
   concatenate_inputs = tf.keras.layers.concatenate(inputs=[
     convolved_coordinates, encoded_coordinates])
-  transformer_output = TransformerLayer(1, 5, 5, 61, concatenate_inputs)
-
 
 
   return tf.keras.Model(inputs=[normalized_coordinates, cond],
-      outputs=tf.keras.layers.Identity()(transformer_output))
+      outputs=tf.keras.layers.Identity()(concatenate_inputs))
 
 def CondModel(residue_lookup_size, atom_lookup_size):
   residue_names = tf.keras.Input(shape=(None,), name='residue_names')
