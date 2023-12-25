@@ -152,7 +152,7 @@ class GammaModule(tf.Module):
     self._l1 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
     self._l2 = tf.keras.layers.Dense(
-        1024, activation='sigmoid',
+        2048, activation='sigmoid',
         kernel_constraint=tf.keras.constraints.NonNeg())
     self._l3 = tf.keras.layers.Dense(
         1, kernel_constraint=tf.keras.constraints.NonNeg())
