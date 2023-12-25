@@ -148,7 +148,7 @@ def ScoreModel():
   return tf.keras.Model(inputs=[z, gamma, cond], outputs=score)
 
 def GammaModel():
-  ts = tf.keras.Input(shape=(None, None))
+  ts = tf.keras.Input(shape=(None, None, 1))
   l1 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
   l2 = tf.keras.layers.Dense(
@@ -157,7 +157,7 @@ def GammaModel():
   l3 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
   gamma = -1 * (l1(ts) + l3(l2(ts)))
-  return tf.keras.Model(inputs=times, outputs=gamma)
+  return tf.keras.Model(inputs=ts, outputs=gamma)
 
 MODEL_FOR_TRAINING = lambda vocab: diffusion_model.DiffusionModel(
     GammaModel(), diffusion_model.DecoderTrain(DecoderModel()),

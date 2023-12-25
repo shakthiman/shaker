@@ -382,11 +382,11 @@ class DiffusionModel:
     self._scorer = scorer
 
   def save(self, location):
-    self._decoder.save(location + '/decoder_model.keras')
-    self._encoder.save(location + '/encoder_model.keras')
-    self._conditioner.save(location + '/conditioner_model.keras')
-    self._scorer.save(location + '/scorer_model.keras')
-    self._gamma_model.save_weights(location + '/gamma_model.keras', overwrite=True,
+    self._decoder.save(location + '/decoder_model')
+    self._encoder.save(location + '/encoder_model')
+    self._conditioner.save(location + '/conditioner_model')
+    self._scorer.save(location + '/scorer_model')
+    self._gamma_model.save_weights(location + '/gamma_model', overwrite=True,
             options=tf.train.CheckpointOptions())
 
   # Computes the PDF for sampling z at time t.
