@@ -147,23 +147,20 @@ def ScoreModel():
 
   return tf.keras.Model(inputs=[z, gamma, cond], outputs=score)
 
-class GammaModule(tf.Module):
-  def __init__(self):
-    self._l1 = tf.keras.layers.Dense(
+def GammaModel():
+  ts = tf.keras.Input(shape=(None, None))
+  l1 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
-    self._l2 = tf.keras.layers.Dense(
-        2048, activation='sigmoid',
-        kernel_constraint=tf.keras.constraints.NonNeg())
-    self._l3 = tf.keras.layers.Dense(
-        1, kernel_constraint=tf.keras.constraints.NonNeg())
-
-  @tf.function
-  def GetGamma(self, ts):
-    l1_t = self._l1(ts)
-    return -1*(l1_t + self._l3(self._l2(self._l1(ts))))
+  l2 = tf.keras.layers.Dense(
+      2048, activation='sigmoid',
+      kernel_constraint=tf.keras.constraints.NonNeg())
+  l3 = tf.keras.layers.Dense(
+      1, kernel_constraint=tf.keras.constraints.NonNeg())
+  gamma = -1 * (l1(ts) + l3(l2(ts)))
+  return tf.keras.Model(inputs=times, outputs=gamma)
 
 MODEL_FOR_TRAINING = lambda vocab: diffusion_model.DiffusionModel(
-    GammaModule(), diffusion_model.DecoderTrain(DecoderModel()),
+    GammaModel(), diffusion_model.DecoderTrain(DecoderModel()),
     diffusion_model.EncoderTrain(EncoderModel()),
     diffusion_model.CondTrain(
       CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
