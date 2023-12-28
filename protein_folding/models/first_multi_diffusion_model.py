@@ -47,6 +47,7 @@ def AminoAcidPositionalEmbedding(z):
 
 class VectorizedMapLayer(tf.keras.layers.Layer):
   def __init__(self, map_layer):
+    super(VectorizedMapLayer, self).__init__()
     self._map_layer = map_layer
 
   def call(self, input_tensor):
