@@ -170,7 +170,7 @@ def ScoreModel():
   score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
     inputs=[concatenated_features, upsampled_transformer_output[:,:,:sequence_size,:]]))
 
-  return tf.keras.Model(inputs=[z, gamma, cond], outputs=score)
+  return tf.keras.Model(inputs=[z, z_mask, gamma, cond], outputs=score)
 
 def GammaModel():
   ts = tf.keras.Input(shape=(None, None))
