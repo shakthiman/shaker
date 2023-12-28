@@ -98,6 +98,7 @@ class ScoreTrain(object):
   def score(self, z, z_mask, gamma, cond, training):
     score_val =  self._model({
       'z': z,
+      'z_mask': z_mask,
       'gamma': gamma,
       'cond': cond}, training=training)
     return score_val
