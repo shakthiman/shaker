@@ -45,6 +45,13 @@ def AminoAcidPositionalEmbedding(z):
   pemb = tf.keras.layers.concatenate([tf.math.sin(pemb), tf.math.cos(pemb)])
   return pemb
 
+class VectorizedMapLayer(tf.keras.layers.Layer):
+  def __init__(self, map_layer):
+    self._map_layer = map_layer
+
+  def call(self, input_tensor):
+    return tf.vectorized_map(self._map_layer, input_tensor)
+
 def EncoderModel():
   normalized_coordinates = tf.keras.Input(shape=(None, None, 3),
       name='normalized_coordinates')
@@ -57,7 +64,7 @@ def EncoderModel():
 
   conv_layer = tf.keras.layers.SeparableConv1D(
       32, ENCODER_CONVOLVE_SIZE, activation='gelu', padding='same')
-  convolved_coordinates = tf.vectorized_map(conv_layer, encoded_coordinates)
+  convolved_coordinates = VectorizedMapLayer(conv_layer)(encoded_coordinates)
   concatenate_inputs = tf.keras.layers.concatenate(inputs=[
     convolved_coordinates, encoded_coordinates])
 
@@ -74,7 +81,7 @@ def DecoderModel():
   base_inputs = tf.keras.layers.concatenate(inputs=[
     z_0_rescaled, cond, pemb])
   conv_layer = tf.keras.layers.Conv1DTranspose(32, ENCODER_CONVOLVE_SIZE, padding='same')
-  convolved_inputs = tf.vectorized_map(conv_layer, base_inputs)
+  convolved_inputs = VectorizedMapLayer(conv_layer)(base_inputs)
   concatenated_inputs = tf.keras.layers.concatenate(inputs=[base_inputs, convolved_inputs])
 
   scale_diag = tf.Variable(1.0)
@@ -124,7 +131,7 @@ def ScoreModel():
       inputs=[z, cond, temb, pemb])
   score_convolve_layer = tf.keras.layers.Conv1DTranspose(
       64, ENCODER_CONVOLVE_SIZE, padding='same', activation='gelu')
-  convolved_features = tf.vectorized_map(score_convolve_layer, base_features)
+  convolved_features = VectorizedMapLayer(score_convolve_layer)(base_features)
   concatenated_features = tf.keras.layers.concatenate(
       inputs=[base_features, convolved_features])
 
@@ -141,13 +148,13 @@ def ScoreModel():
   conv_layer = tf.keras.layers.SeparableConv1D(
       64, 10, padding='same')
   pooling_layer = tf.keras.layers.AveragePooling1D(10, padding='same')
-  reduced_features = tf.vectorized_map(conv_layer, padded_features)
-  reduced_features = tf.vectorized_map(pooling_layer, reduced_features)
+  reduced_features = VectorizedMapLayer(conv_layer)(padded_features)
+  reduced_features = VectorizedMapLayer(pooling_layer)(reduced_features)
 
   mask_reducer = tf.keras.layers.MaxPooling1D(10)
   z_mask_shape = tf.shape(z_mask)
   reduced_mask = tf.reshape(
-      tf.vectorized_map(mask_reducer, tf.expand_dims(z_mask, -1))>0,
+      VectorizedMapLayer(mask_reducer)(tf.expand_dims(z_mask, -1))>0,
       [z_mask_shape[0], -1])
   reduced_features_shape = tf.shape(reduced_features)
   reduced_features = tf.reshape(
