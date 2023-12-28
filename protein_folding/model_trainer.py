@@ -73,7 +73,7 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab,
               'normalized_coordinates': [None, None, 3]})
   cpu_step = 0
   for step, training_data in tds.enumerate():
-    _MultiChainTrainStep()
+    _MultiChainTrainStep(training_data, model, optimizer)
     if cpu_step%10==0:
       print(cpu_step)
     cpu_step += 1
