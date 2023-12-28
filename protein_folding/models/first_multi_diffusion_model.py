@@ -165,7 +165,7 @@ def ScoreModel():
       transformer_output)
   upsampled_transformer_output = tf.reshape(
       upsampled_transformer_output,
-      [z_mask_shape[0], num_peptides, ideal_sequence_size, -1])
+      [z_mask_shape[0], num_peptides, ideal_sequence_size, 64])
 
   score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
     inputs=[concatenated_features, upsampled_transformer_output[:,:,:sequence_size,:]]))
