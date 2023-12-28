@@ -11,7 +11,7 @@ AMINO_ACID_EMBEDDING_DIMS = 20
 
 # Transformer Unit
 def AttentionLayer(num_heads, inputs, inputs_mask):
-  attention_mask = tf.expand_dims(inputs_mask,-1) * tf.expand_dims(inputs_mask, -2)
+  attention_mask = tf.math.logical_and(tf.expand_dims(inputs_mask,-1), tf.expand_dims(inputs_mask, -2))
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([
         inputs, tf.keras.layers.MultiHeadAttention(num_heads, 10)(
