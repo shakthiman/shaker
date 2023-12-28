@@ -30,8 +30,8 @@ class DecoderTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf',
-        options=tf.saved_model.SaveOptions())
+    self._model.save_weights(location, overwrite=True,
+        options=tf.train.CheckpointOptions())
 
 class EncoderTrain(object):
   def __init__(self, model):
@@ -56,8 +56,8 @@ class EncoderTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf',
-            options=tf.saved_model.SaveOptions())
+    self._model.save_weights(location, overwrite=True,
+        options=tf.train.CheckpointOptions())
 
 class CondTrain(object):
   def __init__(self, model):
@@ -80,9 +80,9 @@ class CondTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(
-      location, overwrite=True, save_format='tf',
-      options=tf.saved_model.SaveOptions())
+    self._model.save_weights(
+      location, overwrite=True,
+      options=tf.train.CheckpointOptions())
 
 class ScoreTrain(object):
   def __init__(self, model):
@@ -109,23 +109,24 @@ class ScoreTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf', options=tf.saved_model.SaveOptions())
+    self._model.save_weights(location, overwrite=True,
+        options=tf.train.CheckpointOptions())
 
 SampleStepWitness = namedtuple(
         'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error', 'log_prob'])
 
 class DiffusionModel:
-  def __init__(self, gamma_module, decoder, encoder, conditioner, scorer):
+  def __init__(self, gamma_model, decoder, encoder, conditioner, scorer):
     self._timesteps = 10000
 
-    self._gamma_module = gamma_module
+    self._gamma_model = gamma_model
     self._decoder = decoder
     self._encoder = encoder
     self._conditioner = conditioner
     self._scorer = scorer
 
   def gamma(self, ts):
-    return self._gamma_module.GetGamma(ts)
+    return self._gamma_model(ts)
 
   def gamma_scalar(self, ts):
     return tf.squeeze(tf.squeeze(self.gamma(tf.expand_dims(tf.expand_dims(ts, -1), -1)), -1), -1)
@@ -150,7 +151,7 @@ class DiffusionModel:
         self._encoder.trainable_weights() +
         self._conditioner.trainable_weights() +
         self._scorer.trainable_weights() +
-        list(self._gamma_module.trainable_variables))
+        list(self._gamma_model.trainable_variables))
 
   def decoder_weights(self):
     return self._decoder.trainable_weights()
@@ -380,15 +381,13 @@ class DiffusionModel:
   def set_scorer(self, scorer):
     self._scorer = scorer
 
-  def set_gamma_module(self, gamma_module):
-    self._gamma_module = gamma_module
-
   def save(self, location):
     self._decoder.save(location + '/decoder_model')
     self._encoder.save(location + '/encoder_model')
     self._conditioner.save(location + '/conditioner_model')
     self._scorer.save(location + '/scorer_model')
-    tf.saved_model.save(self._gamma_module, location + '/gamma_module')
+    self._gamma_model.save_weights(location + '/gamma_model', overwrite=True,
+            options=tf.train.CheckpointOptions())
 
   # Computes the PDF for sampling z at time t.
   def log_prob(self, f, z_t, g_t):
@@ -398,12 +397,3 @@ class DiffusionModel:
     z_t_distribution = tfd.MultivariateNormalDiag(
         loc=f*alpha, scale_diag=tf.math.sqrt(var)*tf.ones_like(f))
     return tf.math.reduce_sum(z_t_distribution.log_prob(z_t))
-
-def LoadDiffusionModel(location_prefix):
-  return DiffusionModel(
-      residue_lookup_size, atom_lookup_size,
-      tf.saved_model.load(location_prefix + '/gamma_module'),
-      DecoderTrain(tf.keras.models.load_model(location_prefix+'/decoder_model')),
-      EncoderTrain(tf.keras.models.load_model(location_prefix+'/encoder_model')),
-      CondTrain(tf.keras.models.load_model(location_prefix+'/conditioner_model')),
-      ScoreTrain(tf.keras.models.load_model(location_prefix+'/scorer_model')))
