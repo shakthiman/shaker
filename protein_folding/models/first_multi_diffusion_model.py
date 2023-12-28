@@ -69,7 +69,7 @@ def DecoderModel():
       shape=(None, None, Z_EMBEDDING_SIZE),
       name='z_0_rescaled')
   cond = tf.keras.Input(shape=(None, None, COND_EMBEDDING_SIZE), name='cond')
-  pemb = PositionalEmbedding(z_0_rescaled)
+  pemb = AminoAcidPositionalEmbedding(z_0_rescaled)
   
   base_inputs = tf.keras.layers.concatenate(inputs=[
     z_0_rescaled, cond, pemb])
