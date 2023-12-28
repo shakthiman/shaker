@@ -13,6 +13,15 @@ def _SingleChainTrainStep(training_data, model, optimizer):
       tf.reduce_mean(l1), tf.reduce_mean(l2), tf.reduce_mean(l3),
       tf.reduce_mean(loss_diff_mse), recon_diff)
 
+@tf.function(reduce_retracing=True)
+def _MultiChainTrainStep(training_data, model, optimizer):
+  with tf.GradientTape() as tape:
+    l1, l2, l3, loss_diff_mse, recon_diff = model.compute_model_loss(training_data)
+    loss = tf.reduce_mean(l1+l2+l3)
+  training = model.trainable_weights()
+  grads = tape.gradient(loss, trainable_weights)
+  optimizer.apply_gradients(zip(grads, trainable_weights))
+
 def TrainSingleChainModel(ds,
     shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer,
     write_target):
@@ -27,7 +36,7 @@ def TrainSingleChainModel(ds,
               'residue_names': [None],
               'atom_names': [None],
               'normalized_coordinates': [None, 3],
-              }).prefetch(10)
+              }).prefetch(prefetch_size)
   for step, training_data in tds.enumerate():
     l1, l2, l3, loss_diff_mse, recon_diff = _SingleChainTrainStep(
             training_data, model, optimizer)
@@ -50,3 +59,21 @@ def TrainSingleChainModel(ds,
       print("Seen so far: %s samples" % ((step + 1) * batch_size))
     if step % 200==0:
       model.save('{}/version_{}'.format(write_target, step))
+
+def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer, write_target):
+  tds = ds.shuffle(shuffle_size).map(
+      lambda x: {
+        'residue_names': pdb_vocab.GetResidueNamesId(x['resname'].to_tensor()),
+        'atom_names': pdb_vocab.GetAtomNamesId(x['atom_name'].to_tensor()),
+        'normalized_coordinates': x['atom_coords'].to_tensor()}).padded_batch(
+            batch_size,
+            padded_shapes={
+              'residue_names': [None, None],
+              'atom_names': [None, None],
+              'normalized_coordinates': [None, None, 3]})
+  cpu_step = 0
+  for step, training_data in tds.enumerate():
+    _MultiChainTrainStep()
+    if cpu_step%10==0:
+      print(cpu_step)
+    cpu_step += 1
