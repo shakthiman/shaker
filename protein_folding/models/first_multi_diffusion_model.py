@@ -152,10 +152,14 @@ def ScoreModel():
   reduced_features = VectorizedMapLayer(conv_layer)(padded_features)
   reduced_features = VectorizedMapLayer(pooling_layer)(reduced_features)
 
-  mask_reducer = tf.keras.layers.MaxPooling1D(10)
+  mask_reducer = tf.keras.layers.MaxPooling1D(10, padding='same')
   z_mask_shape = tf.shape(z_mask)
   reduced_mask = tf.reshape(
-      VectorizedMapLayer(mask_reducer)(tf.expand_dims(z_mask, -1))>0,
+      VectorizedMapLayer(mask_reducer)(tf.expand_dims(
+          tf.pad(z_mask, tf.stack([
+            tf.constant([0, 0]),
+            tf.constant([0, 0]),
+            tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])])), -1))>0,
       [z_mask_shape[0], -1])
   reduced_features_shape = tf.shape(reduced_features)
   reduced_features = tf.reshape(

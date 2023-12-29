@@ -18,7 +18,7 @@ def _MultiChainTrainStep(training_data, model, optimizer):
   with tf.GradientTape() as tape:
     l1, l2, l3, loss_diff_mse, recon_diff = model.compute_model_loss(training_data)
     loss = tf.reduce_mean(l1+l2+l3)
-  training = model.trainable_weights()
+  trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
   optimizer.apply_gradients(zip(grads, trainable_weights))
 
