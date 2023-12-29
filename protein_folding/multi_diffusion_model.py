@@ -1,3 +1,7 @@
+import tensorflow as tf
+import tensorflow_probability as tfp
+tfd = tfp.distributions
+
 class DecoderTrain(object):
   def __init__(self, model):
     self._model = model
