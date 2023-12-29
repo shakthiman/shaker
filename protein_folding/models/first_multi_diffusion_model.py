@@ -128,31 +128,39 @@ def ScoreModel():
   # Compute Amino Acid Positional Embedding
   pemb = AminoAcidPositionalEmbedding(z)
 
+  pooling_size = 100
   base_features = tf.keras.layers.concatenate(
       inputs=[z, cond, temb, pemb])
   score_convolve_layer = tf.keras.layers.Conv1DTranspose(
       64, ENCODER_CONVOLVE_SIZE, padding='same', activation='gelu')
   convolved_features = VectorizedMapLayer(score_convolve_layer)(base_features)
+  score_convolve_layer2 = tf.keras.layers.SeparableConv1D(
+      64, pooling_size, padding='same', activation='gelu')
+  convolved_features2 = VectorizedMapLayer(score_convolve_layer2)(base_features)
   concatenated_features = tf.keras.layers.concatenate(
-      inputs=[base_features, convolved_features])
+      inputs=[base_features, convolved_features, convolved_features2])
 
   # Reduce, Attend, and Upsample.
   num_peptides = tf.shape(concatenated_features)[1]
   sequence_size = tf.shape(concatenated_features)[2]
-  ideal_sequence_size = tf.cast(tf.math.ceil(tf.cast(sequence_size, tf.float32)/10)*10, tf.int32)
+  # Pool the features.
+  ideal_sequence_size = tf.cast(
+      tf.math.ceil(
+        tf.cast(sequence_size, tf.float32)/pooling_size)*pooling_size, tf.int32)
   paddings = tf.stack([tf.constant([0, 0]),
                        tf.constant([0, 0]),
                        tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
                        tf.constant([0, 0])])
   padded_features = tf.ensure_shape(
-      tf.pad(concatenated_features, paddings), [None, None ,None,161])
+      tf.pad(concatenated_features, paddings), [None, None ,None,225])
+
   conv_layer = tf.keras.layers.SeparableConv1D(
-      64, 10, padding='same')
-  pooling_layer = tf.keras.layers.AveragePooling1D(10, padding='same')
+      64, pooling_size, padding='same')
+  pooling_layer = tf.keras.layers.AveragePooling1D(pooling_size, padding='same')
   reduced_features = VectorizedMapLayer(conv_layer)(padded_features)
   reduced_features = VectorizedMapLayer(pooling_layer)(reduced_features)
 
-  mask_reducer = tf.keras.layers.MaxPooling1D(10, padding='same')
+  mask_reducer = tf.keras.layers.MaxPooling1D(pooling_size, padding='same')
   z_mask_shape = tf.shape(z_mask)
   reduced_mask = tf.reshape(
       VectorizedMapLayer(mask_reducer)(tf.expand_dims(
@@ -165,7 +173,7 @@ def ScoreModel():
   reduced_features = tf.reshape(
       reduced_features, [reduced_features_shape[0], -1, reduced_features_shape[-1]])
   transformer_output = TransformerLayer(1, 5, 5, 64, reduced_features, reduced_mask)
-  upsampled_transformer_output = tf.keras.layers.UpSampling1D(10)(
+  upsampled_transformer_output = tf.keras.layers.UpSampling1D(pooling_size)(
       transformer_output)
   upsampled_transformer_output = tf.reshape(
       upsampled_transformer_output,
