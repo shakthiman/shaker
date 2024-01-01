@@ -224,7 +224,7 @@ def ScoreModel():
     tf.constant([0, 0]),
     tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
 
-  transformer_output = TransformerLayer(1, 1000, 5, 10, 5, 161, padded_features, padded_mask)
+  transformer_output = TransformerLayer(10, 1000, 5, 10, 5, 161, padded_features, padded_mask)
   transformer_output = transformer_output[:,:sequence_size,:]
   transformer_output = tf.reshape(transformer_output,
       [original_shape[0], original_shape[1], original_shape[2], -1])

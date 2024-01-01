@@ -21,6 +21,9 @@ def _MultiChainTrainStep(training_data, model, optimizer):
   trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
   optimizer.apply_gradients(zip(grads, trainable_weights))
+  return (
+      tf.reduce_mean(l1), tf.reduce_mean(l2), tf.reduce_mean(l3),
+      tf.reduce_mean(loss_diff_mse), recon_diff)
 
 def TrainSingleChainModel(ds,
     shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer,
@@ -73,7 +76,19 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab,
               'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
   cpu_step = 0
   for step, training_data in tds.enumerate():
-    _MultiChainTrainStep(training_data, model, optimizer)
+    l1, l2, l3, loss_diff_mse, recon_diff = _MultiChainTrainStep(training_data, model, optimizer)
     if cpu_step%10==0:
       print(cpu_step)
+      print("Training L1 Loss (for one batch) at step %d: %.4f"
+                  % (step, l1))
+      print("Training L2 Loss (for one batch) at step %d: %.4f"
+                  % (step, l2))
+      print("Training L3 Loss (for one batch) at step %d: %.4f"
+                  % (step, l3))
+      print("loss_diff_mse (for one batch) at step %d: %.4f"
+                  % (step, loss_diff_mse))
+      print("recon_diff (for one batch) at step %d: %.4f"
+                  % (step, float(recon_diff)))
+    if step % 200==0:
+      model.save('{}/version_{}'.format(write_target, step))
     cpu_step += 1
