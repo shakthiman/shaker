@@ -64,7 +64,11 @@ def TrainSingleChainModel(ds,
       model.save('{}/version_{}'.format(write_target, step))
 
 def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer, write_target):
-  tds = ds.shuffle(shuffle_size).map(
+  def _IgnoreCondition(x):
+    peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'],
+        fn_output_signature=tf.int32)
+    return tf.math.reduce_min(peptide_shapes)==0
+  tds = ds.shuffle(shuffle_size).filter(lambda x: not _IgnoreCondition(x)).map(
       lambda x: {
         'residue_names': pdb_vocab.GetResidueNamesId(x['resname'].to_tensor()),
         'atom_names': pdb_vocab.GetAtomNamesId(x['atom_name'].to_tensor()),
