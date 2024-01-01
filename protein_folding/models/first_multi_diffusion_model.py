@@ -9,13 +9,64 @@ ENCODER_CONVOLVE_SIZE = 10
 TIMESTEP_EMBEDDING_DIMS = 10
 AMINO_ACID_EMBEDDING_DIMS = 20
 
+class CustomSelfAttention(tf.keras.layers.Layer):
+  def __init__(self, num_heads, key_dim):
+    super(CustomSelfAttention, self).__init__()
+    self._attention_layer = tf.keras.layers.MultiHeadAttention(num_heads, key_dim)
+
+  def call(self, input_tensor, input_mask):
+    return tf.map_fn(
+        lambda x: self._attention_layer(x[0], x[0], x[0],
+          tf.math.logical_and(
+            tf.expand_dims(x[1], -1),
+            tf.expand_dims(x[1], -2))), (input_tensor, input_mask))
+
 # Transformer Unit
-def AttentionLayer(num_heads, inputs, inputs_mask):
-  attention_mask = tf.math.logical_and(tf.expand_dims(inputs_mask,-1), tf.expand_dims(inputs_mask, -2))
+def ShapeList(x):
+  ps = x.get_shape().as_list()
+  ts = tf.shape(x)
+  return [ts[i] if ps[i] is None else ps[i] for i in range(len(ps))]
+
+def RefactorX(x, n):
+  x_shape = ShapeList(x)
+  assert len(x_shape) == 3
+  assert x_shape[1] //n == 0
+  return tf.reshape(x, [
+    x_shape[0], # Batch size remains the same.
+    -1, # Additional blocks are introduced.
+    x_shape[1] // n # Number of timesteps reduced by a factor of n.
+    x_shape[2] # Embedding dimension does not change.
+    ])
+
+def StraightenMultipeptideSequence(x):
+  x_shape = ShapeList(x)
+  assert len(x_shape) == 4
+  return tf.reshape(x,[
+    x_shape[0], # Batch size remains the same.
+    -1, # Amino acid dimension.
+    x_shape[3]])
+
+def StraightenMultipeptideMask(x):
+  x_shape = ShapeList(x)
+  assert len(x_shape) == 3
+  return tf.reshape(x, [
+    x_shape[0], # Batch size remains the same.
+    -1 # Amino Acid dimension.
+    ])
+
+def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
+  transposed_x = tf.transpose(refactored_x, perm)
+  transposed_mask = tf.transpose(refactored_mask, perm)
+  score = attention_layer(transposed_x, transposed_mask)
+  return tf.transpose(score, perm)
+
+def AttentionLayer(num_blocks, num_heads, key_dim, inputs, inputs_mask):
+  refactored_x = RefactorX(inputs, num_blocks)
+  refactored_mask = RefactorX(inputs_mask, num_blocks)
+  local_self_attention = CustomSelfAttention(num_heads, key_dim)(refactored_x, refactored_mask)
+  global_self_attention = TransposeAndAttend(CustomSelfAttention(num_heads, key_dim), refactored_x, refactored_mask, [0, 2, 1, 3])
   return tf.keras.layers.LayerNormalization()(
-      tf.keras.layers.Add()([
-        inputs, tf.keras.layers.MultiHeadAttention(num_heads, 10)(
-          inputs, inputs, inputs, attention_mask)]))
+      tf.keras.layers.Add()([inputs, local_self_attention, global_self_attention]))
 
 def FeedForwardLayer(num_layers, output_size, inputs):
   t = inputs
@@ -25,11 +76,11 @@ def FeedForwardLayer(num_layers, output_size, inputs):
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([inputs, t]))
 
-def TransformerLayer(num_transformers, num_heads, num_dnn_layers, output_size,
+def TransformerLayer(num_transformers, num_blocks, num_heads, key_dim, num_dnn_layers, output_size,
     inputs, inputs_mask):
   x = inputs
   for i in range(num_transformers):
-    x = AttentionLayer(num_heads, x, inputs_mask)
+    x = AttentionLayer(num_blocks, num_heads, key_dim, x, inputs_mask)
     x = FeedForwardLayer(num_dnn_layers, output_size, x)
   return x
 
@@ -128,59 +179,41 @@ def ScoreModel():
   # Compute Amino Acid Positional Embedding
   pemb = AminoAcidPositionalEmbedding(z)
 
-  pooling_size = 100
+  num_blocks = 1000
   base_features = tf.keras.layers.concatenate(
       inputs=[z, cond, temb, pemb])
   score_convolve_layer = tf.keras.layers.Conv1DTranspose(
       64, ENCODER_CONVOLVE_SIZE, padding='same', activation='gelu')
   convolved_features = VectorizedMapLayer(score_convolve_layer)(base_features)
-  score_convolve_layer2 = tf.keras.layers.SeparableConv1D(
-      64, pooling_size, padding='same', activation='gelu')
-  convolved_features2 = VectorizedMapLayer(score_convolve_layer2)(base_features)
   concatenated_features = tf.keras.layers.concatenate(
-      inputs=[base_features, convolved_features, convolved_features2])
+      inputs=[base_features, convolved_features])
 
   # Reduce, Attend, and Upsample.
-  num_peptides = tf.shape(concatenated_features)[1]
-  sequence_size = tf.shape(concatenated_features)[2]
+  original_shape = ShapeList(concatenated_features)
+  assert len(original_shape) == 4
+  straightened_features = StraightenMultipeptideSequence(concatenated_features)
+  straightened_mask = StraightenMultipeptideMask(z_mask)
+
+  sequence_size = ShapeList(straightened_features)[1]
   # Pool the features.
   ideal_sequence_size = tf.cast(
       tf.math.ceil(
-        tf.cast(sequence_size, tf.float32)/pooling_size)*pooling_size, tf.int32)
+        tf.cast(sequence_size, tf.float32)/num_blocks)*num_blocks, tf.int32)
   paddings = tf.stack([tf.constant([0, 0]),
-                       tf.constant([0, 0]),
                        tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
                        tf.constant([0, 0])])
-  padded_features = tf.ensure_shape(
-      tf.pad(concatenated_features, paddings), [None, None ,None,225])
+  padded_features = tf.pad(concatenated_features, paddings)
+  padded_mask = tf.pad(straightened_mask, tf.stack([
+    tf.constant([0, 0]),
+    tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
 
-  conv_layer = tf.keras.layers.SeparableConv1D(
-      64, pooling_size, padding='same')
-  pooling_layer = tf.keras.layers.AveragePooling1D(pooling_size, padding='same')
-  reduced_features = VectorizedMapLayer(conv_layer)(padded_features)
-  reduced_features = VectorizedMapLayer(pooling_layer)(reduced_features)
-
-  mask_reducer = tf.keras.layers.MaxPooling1D(pooling_size, padding='same')
-  z_mask_shape = tf.shape(z_mask)
-  reduced_mask = tf.reshape(
-      VectorizedMapLayer(mask_reducer)(tf.expand_dims(
-          tf.pad(z_mask, tf.stack([
-            tf.constant([0, 0]),
-            tf.constant([0, 0]),
-            tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])])), -1))>0,
-      [z_mask_shape[0], -1])
-  reduced_features_shape = tf.shape(reduced_features)
-  reduced_features = tf.reshape(
-      reduced_features, [reduced_features_shape[0], -1, reduced_features_shape[-1]])
-  transformer_output = TransformerLayer(1, 5, 5, 64, reduced_features, reduced_mask)
-  upsampled_transformer_output = tf.keras.layers.UpSampling1D(pooling_size)(
-      transformer_output)
-  upsampled_transformer_output = tf.reshape(
-      upsampled_transformer_output,
-      [z_mask_shape[0], num_peptides, ideal_sequence_size, 64])
-
+  transformer_output = TransformerLayer(1, 1000, 5, 10, 5, 64, padded_features, padded_mask)
+  transformer_output = transformer_output[:,:sequence_size,:]
+  transformer_output = tf.reshape(transformer_output,
+      [original_shape[0], original_shape[1], original_shape[2], -1])
+  
   score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
-    inputs=[concatenated_features, upsampled_transformer_output[:,:,:sequence_size,:]]))
+    inputs=[concatenated_features, transformer_output]))
 
   return tf.keras.Model(inputs=[z, z_mask, gamma, cond], outputs=score)
 
