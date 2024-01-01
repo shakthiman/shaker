@@ -15,11 +15,15 @@ class CustomSelfAttention(tf.keras.layers.Layer):
     self._attention_layer = tf.keras.layers.MultiHeadAttention(num_heads, key_dim)
 
   def call(self, input_tensor, input_mask):
+    def _test_fn(x):
+      print(x)
+      return self._attention_layer(x[0], x[0], x[0],
+          #tf.math.logical_and(
+          #  tf.expand_dims(x[1], -1),
+          #  tf.expand_dims(x[1], -2))
+          )
     return tf.map_fn(
-        lambda x: self._attention_layer(x[0], x[0], x[0],
-          tf.math.logical_and(
-            tf.expand_dims(x[1], -1),
-            tf.expand_dims(x[1], -2))), (input_tensor, input_mask))
+        _test_fn, tf.tuple([input_tensor, tf.cast(tf.expand_dims(input_mask, -1), tf.float32)]), fn_output_signature=tf.float32)
 
 # Transformer Unit
 def ShapeList(x):
@@ -29,14 +33,23 @@ def ShapeList(x):
 
 def RefactorX(x, n):
   x_shape = ShapeList(x)
-  assert len(x_shape) == 3
-  assert x_shape[1] //n == 0
+  assert len(x_shape) == 3, len(x_shape)
   return tf.reshape(x, [
     x_shape[0], # Batch size remains the same.
     -1, # Additional blocks are introduced.
-    x_shape[1] // n # Number of timesteps reduced by a factor of n.
+    x_shape[1] // n, # Number of timesteps reduced by a factor of n.
     x_shape[2] # Embedding dimension does not change.
     ])
+
+def RefactorXMask(x_mask, n):
+  x_mask_shape = ShapeList(x_mask)
+  assert len(x_mask_shape) == 2, len(x_mask_shape)
+  return tf.reshape(x_mask, [
+    x_mask_shape[0], # Batch size remains the same.
+    -1, # Additional blocks are introduced.
+    x_mask_shape[1] // n # Number of timesteps reduced by a factor of n.
+    ])
+
 
 def StraightenMultipeptideSequence(x):
   x_shape = ShapeList(x)
@@ -56,13 +69,13 @@ def StraightenMultipeptideMask(x):
 
 def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
   transposed_x = tf.transpose(refactored_x, perm)
-  transposed_mask = tf.transpose(refactored_mask, perm)
+  transposed_mask = tf.transpose(refactored_mask, perm[:-1])
   score = attention_layer(transposed_x, transposed_mask)
   return tf.transpose(score, perm)
 
 def AttentionLayer(num_blocks, num_heads, key_dim, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, num_blocks)
-  refactored_mask = RefactorX(inputs_mask, num_blocks)
+  refactored_mask = RefactorXMask(tf.cast(inputs_mask, tf.bool), num_blocks)
   local_self_attention = CustomSelfAttention(num_heads, key_dim)(refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(CustomSelfAttention(num_heads, key_dim), refactored_x, refactored_mask, [0, 2, 1, 3])
   return tf.keras.layers.LayerNormalization()(
@@ -202,7 +215,8 @@ def ScoreModel():
   paddings = tf.stack([tf.constant([0, 0]),
                        tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
                        tf.constant([0, 0])])
-  padded_features = tf.pad(concatenated_features, paddings)
+  padded_features = tf.pad(straightened_features, paddings)
+  padded_features = tf.ensure_shape(padded_features, [None, None, 255])
   padded_mask = tf.pad(straightened_mask, tf.stack([
     tf.constant([0, 0]),
     tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
