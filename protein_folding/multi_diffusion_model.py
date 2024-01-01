@@ -2,6 +2,14 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
 
+def _SaveModel(model, location):
+  model.save(location, overwrite=True, save_format='tf',
+      options=tf.saved_model.SaveOptions())
+
+def _SaveWeights(model, location):
+  model.save_weights(location, overwrite=True, save_format='tf',
+      options=tf.train.CheckpointOptions())
+
 class DecoderTrain(object):
   def __init__(self, model):
     self._model = model
@@ -27,9 +35,11 @@ class DecoderTrain(object):
   def trainable_weights(self):
     return self._model.trainable_weights
 
-  def save(self, tmp_location, location):
-    self._model.save_weights(location, overwrite=True, save_format='tf',
-        options=tf.saved_model.SaveOptions())
+  def save(self, location):
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
 
 class EncoderTrain(object):
   def __init__(self, model):
@@ -55,8 +65,10 @@ class EncoderTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf',
-            options=tf.saved_model.SaveOptions())
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
 
 class CondTrain(object):
   def __init__(self, model):
@@ -79,9 +91,10 @@ class CondTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(
-      location, overwrite=True, save_format='tf',
-      options=tf.saved_model.SaveOptions())
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
 
 class ScoreTrain(object):
   def __init__(self, model):
@@ -111,7 +124,10 @@ class ScoreTrain(object):
     return self._model.trainable_weights
 
   def save(self, location):
-    self._model.save(location, overwrite=True, save_format='tf', options=tf.saved_model.SaveOptions())
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
 
 class MultiDiffusionModel:
   def __init__(self, gamma_model, decoder, encoder, conditioner, scorer):
@@ -227,3 +243,17 @@ class MultiDiffusionModel:
 
     loss_diff, loss_diff_mse = self.diffusion_loss(t, f, x_mask, cond, training)
     return (loss_diff, loss_klz, loss_recon, loss_diff_mse, recon_diff)
+
+  def save(self, location):
+    self._decoder.save(location + '/decoder_model')
+    self._encoder.save(location + '/encoder_model')
+    self._conditioner.save(location + '/conditioner_model')
+    self._scorer.save(location + '/scorer_model')
+    _SaveModel(self._gamma_model, location + '/gamma_model')
+
+  def save_weights(self, location):
+    self._decoder.save_weights(location + '/decoder_model')
+    self._encoder.save_weights(location + '/encoder_model')
+    self._conditioner.save_weights(location + '/conditioner_model')
+    self._scorer.save_weights(location + '/scorer_model')
+    _SaveWeights(self._gamma_model, location + '/gamma_model')

@@ -63,7 +63,7 @@ def TrainSingleChainModel(ds,
     if step % 200==0:
       model.save('{}/version_{}'.format(write_target, step))
 
-def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer, write_target):
+def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, save_frequency, pdb_vocab, model, optimizer, write_target):
   def _IgnoreCondition(x):
     peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'],
         fn_output_signature=tf.int32)
@@ -93,6 +93,6 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab,
                   % (step, loss_diff_mse))
       print("recon_diff (for one batch) at step %d: %.4f"
                   % (step, float(recon_diff)))
-    #if step % 200==0:
-    #  model.save('{}/version_{}'.format(write_target, step))
+    if cpu_step % save_frequency==0:
+      model.save('{}/version_{}'.format(write_target, step))
     cpu_step += 1
