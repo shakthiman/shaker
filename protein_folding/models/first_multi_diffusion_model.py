@@ -216,7 +216,7 @@ def ScoreModel():
                        tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
                        tf.constant([0, 0])])
   padded_features = tf.pad(straightened_features, paddings)
-  padded_features = tf.ensure_shape(padded_features, [None, None, 255])
+  padded_features = tf.ensure_shape(padded_features, [None, None, 64])
   padded_mask = tf.pad(straightened_mask, tf.stack([
     tf.constant([0, 0]),
     tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
@@ -227,7 +227,7 @@ def ScoreModel():
       [original_shape[0], original_shape[1], original_shape[2], -1])
   
   score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
-    inputs=[concatenated_features, transformer_output]))
+    inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 64])]))
 
   return tf.keras.Model(inputs=[z, z_mask, gamma, cond], outputs=score)
 
