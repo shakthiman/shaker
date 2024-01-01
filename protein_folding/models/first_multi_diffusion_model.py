@@ -16,14 +16,14 @@ class CustomSelfAttention(tf.keras.layers.Layer):
 
   def call(self, input_tensor, input_mask):
     def _test_fn(x):
-      print(x)
       return self._attention_layer(x[0], x[0], x[0],
-          #tf.math.logical_and(
-          #  tf.expand_dims(x[1], -1),
-          #  tf.expand_dims(x[1], -2))
+          tf.math.logical_and(
+            tf.expand_dims(x[1], -1),
+            tf.expand_dims(x[1], -2))
           )
     return tf.map_fn(
-        _test_fn, tf.tuple([input_tensor, tf.cast(tf.expand_dims(input_mask, -1), tf.float32)]), fn_output_signature=tf.float32)
+        _test_fn, tf.tuple([input_tensor, input_mask]),
+        fn_output_signature=tf.float32)
 
 # Transformer Unit
 def ShapeList(x):
@@ -79,7 +79,10 @@ def AttentionLayer(num_blocks, num_heads, key_dim, inputs, inputs_mask):
   local_self_attention = CustomSelfAttention(num_heads, key_dim)(refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(CustomSelfAttention(num_heads, key_dim), refactored_x, refactored_mask, [0, 2, 1, 3])
   return tf.keras.layers.LayerNormalization()(
-      tf.keras.layers.Add()([inputs, local_self_attention, global_self_attention]))
+      tf.keras.layers.Add()([
+          inputs,
+          tf.reshape(local_self_attention, ShapeList(inputs)),
+          tf.reshape(global_self_attention, ShapeList(inputs))]))
 
 def FeedForwardLayer(num_layers, output_size, inputs):
   t = inputs
@@ -216,18 +219,18 @@ def ScoreModel():
                        tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
                        tf.constant([0, 0])])
   padded_features = tf.pad(straightened_features, paddings)
-  padded_features = tf.ensure_shape(padded_features, [None, None, 64])
+  padded_features = tf.ensure_shape(padded_features, [None, None, 161])
   padded_mask = tf.pad(straightened_mask, tf.stack([
     tf.constant([0, 0]),
     tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
 
-  transformer_output = TransformerLayer(1, 1000, 5, 10, 5, 64, padded_features, padded_mask)
+  transformer_output = TransformerLayer(1, 1000, 5, 10, 5, 161, padded_features, padded_mask)
   transformer_output = transformer_output[:,:sequence_size,:]
   transformer_output = tf.reshape(transformer_output,
       [original_shape[0], original_shape[1], original_shape[2], -1])
   
   score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
-    inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 64])]))
+    inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 161])]))
 
   return tf.keras.Model(inputs=[z, z_mask, gamma, cond], outputs=score)
 
