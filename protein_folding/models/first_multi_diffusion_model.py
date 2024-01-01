@@ -195,7 +195,7 @@ def ScoreModel():
   # Compute Amino Acid Positional Embedding
   pemb = AminoAcidPositionalEmbedding(z)
 
-  num_blocks = 1000
+  num_blocks = 200
   base_features = tf.keras.layers.concatenate(
       inputs=[z, cond, temb, pemb])
   score_convolve_layer = tf.keras.layers.Conv1DTranspose(
