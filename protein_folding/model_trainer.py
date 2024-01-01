@@ -70,7 +70,7 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, pdb_vocab,
             padded_shapes={
               'residue_names': [None, None],
               'atom_names': [None, None],
-              'normalized_coordinates': [None, None, 3]})
+              'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
   cpu_step = 0
   for step, training_data in tds.enumerate():
     _MultiChainTrainStep(training_data, model, optimizer)
