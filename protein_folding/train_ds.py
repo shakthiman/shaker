@@ -3,7 +3,18 @@ import tensorflow as tf
 
 from protein_folding import training_example
 
-def GetTFExamples(project, bucket, blob_prefix):
+# Hack to ignore sequences with RNA.
+def _IgnoreCondition(x):
+  peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'], fn_output_signature=tf.int32)
+  return tf.math.reduce_min(peptide_shapes)==0
+
+def _PrepareTFDataset(tf_dataset, prefetch_size):
+  return (tf_dataset.repeat()
+      .map(training_example.ParseProteinOnlyExample)
+      .filter(lambda x: not _IgnoreCondition(x))
+      .prefetch(prefetch_size))
+
+def GetTFExamples(project, bucket, blob_prefix, prefetch_size):
   client = storage.Client(project)
   blobs = client.list_blobs(bucket, prefix=blob_prefix)
   files_by_cluster = dict()
@@ -17,11 +28,12 @@ def GetTFExamples(project, bucket, blob_prefix):
 
   raw_datasets = []
   for cluster, files in files_by_cluster.items():
-    raw_datasets.append(tf.data.TFRecordDataset(files).repeat())
+    raw_datasets.append(_PrepareTFDataset(
+      tf.data.TFRecordDataset(files), prefetch_size))
 
-  return tf.data.Dataset.sample_from_datasets(raw_datasets).map(training_example.ParseProteinOnlyExample)
+  return tf.data.Dataset.sample_from_datasets(raw_datasets)
 
-def GetSmallTFExamples(project, bucket, blob_prefix, size):
+def GetSmallTFExamples(project, bucket, blob_prefix, prefetch_size, size):
   client = storage.Client(project)
   blobs = client.list_blobs(bucket, prefix=blob_prefix)
   files_by_cluster = dict()
@@ -35,6 +47,7 @@ def GetSmallTFExamples(project, bucket, blob_prefix, size):
 
   raw_datasets = []
   for cluster, files in list(files_by_cluster.items())[:size]:
-    raw_datasets.append(tf.data.TFRecordDataset(files).repeat())
+    raw_datasets.append(_PrepareTFDataset(
+      tf.data.TFRecordDataset(files), prefetch_size))
 
-  return tf.data.Dataset.sample_from_datasets(raw_datasets).map(training_example.ParseProteinOnlyExample)
+  return tf.data.Dataset.sample_from_datasets(raw_datasets)
