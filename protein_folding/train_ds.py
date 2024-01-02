@@ -10,13 +10,24 @@ def _IgnoreCondition(x):
 
 def _PrepareTFDataset(filenames, num_parallel_calls):
   return (
-      tf.data.Dataset.from_tensor_slices(filenames).repeat()
-      .interleave(tf.data.TFRecordDataset, cycle_length=1)
+      tf.data.TFRecordDataset(filenames)
       .map(training_example.ParseProteinOnlyExample,
           num_parallel_calls=num_parallel_calls)
       .filter(lambda x: not _IgnoreCondition(x)))
 
-def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls):
+def _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
+    cluster_shuffle_size, cluster_cycle_length):
+  all_files = [files for cluster, files in files_by_cluster.items()]
+  return (
+      tf.data.Dataset.from_tensor_slices(all_files)
+      .repeat()
+      .shuffle(cluster_shuffle_size)
+      .interleave(
+        lambda filenames: _PrepareTFDataset(filenames, num_parallel_calls),
+        cycle_length=cluster_cycle_length))
+
+def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls,
+    cluster_shuffle_size, cluster_cycle_length):
   client = storage.Client(project)
   blobs = client.list_blobs(bucket, prefix=blob_prefix)
   files_by_cluster = dict()
@@ -27,12 +38,8 @@ def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls):
         '/'.join(["gs:/", bucket, prefix, cluster_id, suffix]))
     all_prefixes.add(prefix)
   assert len(all_prefixes)==1, "Should have only 1 prefix."
-
-  raw_datasets = []
-  for cluster, files in files_by_cluster.items():
-    raw_datasets.append(_PrepareTFDataset(files, num_parallel_calls))
-
-  return tf.data.Dataset.sample_from_datasets(raw_datasets)
+  return _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
+      cluster_shuffle_size, cluster_cycle_length)
 
 def GetSmallTFExamples(project, bucket, blob_prefix, num_parallel_calls, size):
   client = storage.Client(project)
