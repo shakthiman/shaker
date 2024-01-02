@@ -89,6 +89,8 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, save_frequ
                   % (step, loss_diff_mse))
       print("recon_diff (for one batch) at step %d: %.4f"
                   % (step, float(recon_diff)))
-    if cpu_step % save_frequency==0:
+    if cpu_step == 0:
       model.save('{}/version_{}'.format(write_target, step))
+    elif cpu_step % save_frequency==0:
+      model.save_weights('{}/version_{}'.format(write_target, step))
     cpu_step += 1
