@@ -17,13 +17,13 @@ def _PrepareTFDataset(filenames, num_parallel_calls):
 
 def _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
     cluster_shuffle_size, cluster_cycle_length):
-  all_files = [files for cluster, files in files_by_cluster.items()]
+  all_files = [tf.io.serialize_tensor(tf.constant(files)) for cluster, files in files_by_cluster.items()]
   return (
       tf.data.Dataset.from_tensor_slices(all_files)
       .repeat()
       .shuffle(cluster_shuffle_size)
       .interleave(
-        lambda filenames: _PrepareTFDataset(filenames, num_parallel_calls),
+        lambda filenames: _PrepareTFDataset(tf.io.parse_tensor(filenames, tf.string), num_parallel_calls),
         cycle_length=cluster_cycle_length))
 
 def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls,
