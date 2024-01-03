@@ -6,7 +6,9 @@ from protein_folding import training_example
 # Hack to ignore sequences with RNA.
 def _IgnoreCondition(x):
   peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'], fn_output_signature=tf.int32)
-  return tf.math.reduce_min(peptide_shapes)==0
+  return tf.math.logical_or(
+          tf.math.equal(tf.math.reduce_min(peptide_shapes), 0),
+          tf.math.greater(tf.shape(peptide_shapes)[0], 10))
 
 def _PrepareTFDataset(filenames, num_parallel_calls):
   return (
