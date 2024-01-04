@@ -244,7 +244,7 @@ def GammaModel():
       kernel_constraint=tf.keras.constraints.NonNeg())
   l3 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
-  gamma = -1 * (l1(expanded_ts) + l3(l2(expanded_ts)))
+  gamma = -1 * (l1(expanded_ts) + l3(l2(expanded_ts)) + ts)
   return tf.keras.Model(inputs=ts, outputs=gamma)
 
 MODEL_FOR_TRAINING = lambda vocab: multi_diffusion_model.MultiDiffusionModel(
