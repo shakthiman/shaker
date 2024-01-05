@@ -154,10 +154,10 @@ class MultiDiffusionModel:
   def variance_preserving_map(self, x, gamma, eps):
     a = self.alpha(gamma)
     var = self.sigma2(gamma)
-    s1 = tf.expand_dims(tf.expand_dims(a, axis=-1), axis=-1)*x
+    s1 = tf.expand_dims(tf.expand_dims(tf.expand_dims(a, axis=-1), axis=-1), -1)*x
     s2 =  (
-      tf.expand_dims(
-        tf.expand_dims(tf.math.sqrt(var), axis=-1), axis=-1) * eps)
+      tf.expand_dims(tf.expand_dims(
+        tf.expand_dims(tf.math.sqrt(var), axis=-1), axis=-1), -1) * eps)
     return s1 + s2
 
   def trainable_weights(self):
