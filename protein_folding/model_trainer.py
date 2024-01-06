@@ -23,7 +23,8 @@ def _MultiChainTrainStep(training_data, model, optimizer):
   trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
   optimizer.apply_gradients(zip(grads, trainable_weights))
-  grad_norm = functools.reduce(lambda x,y: x + tf.norm(y), grads)
+  grad_norm = functools.reduce(lambda x,y: tf.math.add(x, tf.norm(y)),
+      grads, 0.0)
   return (
       tf.reduce_mean(l1), tf.reduce_mean(l2), tf.reduce_mean(l3),
       tf.reduce_mean(loss_diff_mse), recon_diff, grad_norm)
@@ -89,10 +90,9 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
       tf.summary.scalar('l3_loss', l3, step=step)
       tf.summary.scalar('loss_diff_mse', loss_diff_mse, step=step)
       tf.summary.scalar('recon_diff', recon_diff, step=step)
-      tf.summary.scalar('training_data_dim_0', tf.shape(training_data)[0], step=step)
-      tf.summary.scalar('training_data_dim_1', tf.shape(training_data)[1], step=step)
-      tf.summary.scalar('training_data_dim_2', tf.shape(training_data)[2], step=step)
-      tf.summary.scalar('training_data_dim_3', tf.shape(training_data)[3], step=step)
+      tf.summary.scalar('training_data_dim_0', tf.shape(training_data['residue_names'])[0], step=step)
+      tf.summary.scalar('training_data_dim_1', tf.shape(training_data['residue_names'])[1], step=step)
+      tf.summary.scalar('training_data_dim_2', tf.shape(training_data['residue_names'])[2], step=step)
       tf.summary.scalar('grad_norm', grad_norm, step=step)
     if cpu_step%10==0:
       print(cpu_step)
