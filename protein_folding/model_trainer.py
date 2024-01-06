@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+import functools
+
 @tf.function(reduce_retracing=True)
 def _SingleChainTrainStep(training_data, model, optimizer):
   with tf.GradientTape() as tape:
@@ -21,9 +23,10 @@ def _MultiChainTrainStep(training_data, model, optimizer):
   trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
   optimizer.apply_gradients(zip(grads, trainable_weights))
+  grad_norm = functools.reduce(lambda x,y: x + tf.norm(y), grads)
   return (
       tf.reduce_mean(l1), tf.reduce_mean(l2), tf.reduce_mean(l3),
-      tf.reduce_mean(loss_diff_mse), recon_diff)
+      tf.reduce_mean(loss_diff_mse), recon_diff, grad_norm)
 
 def TrainSingleChainModel(ds,
     shuffle_size, batch_size, prefetch_size, pdb_vocab, model, optimizer,
@@ -78,13 +81,19 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
               'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
   cpu_step = 0
   for step, training_data in tds.enumerate():
-    l1, l2, l3, loss_diff_mse, recon_diff = _MultiChainTrainStep(training_data, model, optimizer)
+    l1, l2, l3, loss_diff_mse, recon_diff, grad_norm = _MultiChainTrainStep(
+            training_data, model, optimizer)
     with summary_writer.as_default():
       tf.summary.scalar('l1_loss', l1, step=step)
       tf.summary.scalar('l2_loss', l2, step=step)
       tf.summary.scalar('l3_loss', l3, step=step)
       tf.summary.scalar('loss_diff_mse', loss_diff_mse, step=step)
       tf.summary.scalar('recon_diff', recon_diff, step=step)
+      tf.summary.scalar('training_data_dim_0', tf.shape(training_data)[0], step=step)
+      tf.summary.scalar('training_data_dim_1', tf.shape(training_data)[1], step=step)
+      tf.summary.scalar('training_data_dim_2', tf.shape(training_data)[2], step=step)
+      tf.summary.scalar('training_data_dim_3', tf.shape(training_data)[3], step=step)
+      tf.summary.scalar('grad_norm', grad_norm, step=step)
     if cpu_step%10==0:
       print(cpu_step)
     if cpu_step == 0:
