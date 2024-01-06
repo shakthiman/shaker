@@ -3,12 +3,16 @@ import tensorflow as tf
 
 from protein_folding import training_example
 
-# Hack to ignore sequences with RNA.
 def _IgnoreCondition(x):
   peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'], fn_output_signature=tf.int32)
   return tf.math.logical_or(
-          tf.math.equal(tf.math.reduce_min(peptide_shapes), 0),
-          tf.math.greater(tf.shape(peptide_shapes)[0], 10))
+          tf.stack([
+            # Hack to ignore sequences with RNA.
+            tf.math.equal(tf.math.reduce_min(peptide_shapes), 0),
+            # Too many peptides.
+            tf.math.greater(tf.shape(peptide_shapes)[0], 10),
+            # Too many atoms
+            tf.math.greater(tf.shape(peptide_shapes)[0]*tf.math.reduce_max(peptide_shapes), 40000)]))
 
 def _PrepareTFDataset(filenames, num_parallel_calls):
   return (
