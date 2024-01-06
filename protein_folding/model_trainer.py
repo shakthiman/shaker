@@ -22,9 +22,9 @@ def _MultiChainTrainStep(training_data, model, optimizer):
     loss = tf.reduce_mean(l1+l2+l3)
   trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
+  optimizer.apply_gradients(zip(grads, trainable_weights))
   grad_norm = functools.reduce(lambda x,y: tf.math.add(x, tf.norm(y)),
       grads, 0.0)
-  tf.cond(tf.math.is_nan(grad_norm), lambda: 0, lambda: optimizer.apply_gradients(zip(grads, trainable_weights)))
   return (
       tf.reduce_mean(l1), tf.reduce_mean(l2), tf.reduce_mean(l3),
       tf.reduce_mean(loss_diff_mse), recon_diff, grad_norm)
