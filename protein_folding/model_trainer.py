@@ -63,7 +63,9 @@ def TrainSingleChainModel(ds,
     if step % 200==0:
       model.save('{}/version_{}'.format(write_target, step))
 
-def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, save_frequency, pdb_vocab, model, optimizer, write_target):
+def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
+    save_frequency, pdb_vocab, model, optimizer, write_target, tensorboard_target):
+  summary_writer = tf.summary.create_file_writer(tensorboard_target)
   tds = ds.shuffle(shuffle_size).map(
       lambda x: {
         'residue_names': pdb_vocab.GetResidueNamesId(x['resname'].to_tensor()),
@@ -77,18 +79,14 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size, save_frequ
   cpu_step = 0
   for step, training_data in tds.enumerate():
     l1, l2, l3, loss_diff_mse, recon_diff = _MultiChainTrainStep(training_data, model, optimizer)
+    with summary_writer.as_default():
+      tf.summary.scalar('l1_loss', l1, step=step)
+      tf.summary.scalar('l2_loss', l2, step=step)
+      tf.summary.scalar('l3_loss', l3, step=step)
+      tf.summary.scalar('loss_diff_mse', loss_diff_mse, step=step)
+      tf.summary.scalar('recon_diff', recon_diff, step=step)
     if cpu_step%10==0:
       print(cpu_step)
-      print("Training L1 Loss (for one batch) at step %d: %.4f"
-                  % (step, l1))
-      print("Training L2 Loss (for one batch) at step %d: %.4f"
-                  % (step, l2))
-      print("Training L3 Loss (for one batch) at step %d: %.4f"
-                  % (step, l3))
-      print("loss_diff_mse (for one batch) at step %d: %.4f"
-                  % (step, loss_diff_mse))
-      print("recon_diff (for one batch) at step %d: %.4f"
-                  % (step, float(recon_diff)))
     if cpu_step == 0:
       model.save('{}/version_{}'.format(write_target, step))
     elif cpu_step % save_frequency==0:
