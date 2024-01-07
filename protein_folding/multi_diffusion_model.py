@@ -10,6 +10,11 @@ def _SaveWeights(model, location):
   model.save_weights(location, overwrite=True, save_format='tf',
       options=tf.train.CheckpointOptions())
 
+def LoadModel(full_model_location, model_weight_location, suffix):
+  model = tf.keras.models.load_model(full_model_location + suffix)
+  model.load_weights(model_weight_location + suffix)
+  return model
+
 class DecoderTrain(object):
   def __init__(self, model):
     self._model = model
@@ -257,3 +262,11 @@ class MultiDiffusionModel:
     self._conditioner.save_weights(location + '/conditioner_model')
     self._scorer.save_weights(location + '/scorer_model')
     _SaveWeights(self._gamma_model, location + '/gamma_model')
+
+  def load_model(full_model_location, model_weight_location):
+    return MultiDiffusionModel(
+        LoadModel(full_model_location, model_weight_location, '/gamma_model'),
+        DecoderTrain(LoadModel(full_model_location, model_weight_location, '/decoder_model')),
+        EncoderTrain(LoadModel(full_model_location, model_weight_location, '/encoder_model')),
+        CondTrain(LoadModel(full_model_location, model_weight_location, '/conditioner_model')),
+        ScoreTrain(LoadModel(full_model_location, model_weight_location, '/scorer_model')))
