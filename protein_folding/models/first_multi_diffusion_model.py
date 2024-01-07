@@ -240,7 +240,7 @@ def GammaModel():
   l1 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
   l2 = tf.keras.layers.Dense(
-      2048, activation='sigmoid',
+      2048, activation='gelu',
       kernel_constraint=tf.keras.constraints.NonNeg())
   l3 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
