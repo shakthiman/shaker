@@ -239,9 +239,8 @@ def GammaModel():
   expanded_ts = tf.expand_dims(ts, -1)
   l1 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
-  l2 = tf.keras.layers.Dense(
-      2048, activation='gelu',
-      kernel_constraint=tf.keras.constraints.NonNeg())
+  l2 = lambda x: tf.keras.layers.LeakyReLU(0.01)(
+          tf.keras.layers.Dense(2048, kernel_constraint=tf.keras.constraints.NonNeg())(x))
   l3 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
   gamma = -1 * (l1(expanded_ts) + l3(l2(expanded_ts)) + expanded_ts)
