@@ -14,6 +14,11 @@ def _SaveWeights(model, location):
   model.save_weights(location, overwrite=True, save_format='tf',
       options=tf.train.CheckpointOptions())
 
+def _XMask(x):
+  return tf.cast(
+      tf.math.reduce_any(
+        tf.math.greater(tf.math.abs(x), 1e-6), axis=[-1]), tf.float32)
+
 def LoadModel(full_model_location, model_weight_location, suffix):
   model = tf.keras.models.load_model(full_model_location + suffix)
   model.load_weights(model_weight_location + suffix)
@@ -233,9 +238,7 @@ class MultiDiffusionModel:
     # 1. RECONSTRUCTION LOSS
     # add noise and reconstruct
     f = self._encoder.encode(x, cond, training)
-    x_mask = tf.cast(
-      tf.math.reduce_any(
-        tf.math.greater(tf.math.abs(x), 1e-6), axis=[-1]), tf.float32)
+    x_mask = _XMask(x)
     loss_recon, recon_diff = self.recon_loss(x, f, x_mask, cond, training)
 
     # 2. LATENT LOSS
@@ -270,7 +273,7 @@ class MultiDiffusionModel:
         loc=f*alpha, scale_diag=tf.math.sqrt(var)*tf.ones_like(f))
     return tf.math.reduce_sum(z_t_distribution.log_prob(z_t))
 
-  def sample_step(self, i, T, z_t, cond, f):
+  def sample_step(self, i, T, z_t, cond, f, f_mask):
     eps = tf.random.normal(tf.shape(z_t))
     t = tf.cast((T- i) / T, 'float32')
     s = tf.cast((T- i) / T, 'float32')
@@ -291,7 +294,7 @@ class MultiDiffusionModel:
 
     sigma2_q = sigma2_t_s * sigma2_s / sigma2_t
 
-    eps_hat_cond = self._scorer.score(z_t, g_t, cond, training=False)
+    eps_hat_cond = self._scorer.score(z_t, f_mask, g_t, cond, training=False)
     x = (z_t -sigma_t*eps_hat_cond)/self.alpha(g_t)
     z_s = ((alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t) +
             tf.math.sqrt(sigma2_q) * eps)
@@ -333,7 +336,8 @@ class MultiDiffusionModel:
     for i in range(T-tn, T):
       if i%100==0:
         print('Reconstruct @', i)
-      z_t, w_t = self.sample_step(tf.constant(i), T, z_t, cond, f)
+      z_t, w_t = self.sample_step(tf.constant(i), T, z_t, cond, f,
+          _XMask(x))
       witnesses.append(wt)
 
     # Decode from the embedding sapce.
