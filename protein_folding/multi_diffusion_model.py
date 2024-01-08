@@ -336,7 +336,7 @@ class MultiDiffusionModel:
     for i in range(T-tn, T):
       if i%100==0:
         print('Reconstruct @', i)
-      z_t, w_t = self.sample_step(tf.constant(i), T, z_t, cond, f,
+      z_t, wt = self.sample_step(tf.constant(i), T, z_t, cond, f,
           _XMask(x))
       witnesses.append(wt)
 
