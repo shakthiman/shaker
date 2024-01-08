@@ -1,5 +1,8 @@
+from collections import namedtuple
+
 import tensorflow as tf
 import tensorflow_probability as tfp
+
 tfd = tfp.distributions
 
 def _SaveModel(model, location):
