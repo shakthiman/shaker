@@ -15,6 +15,9 @@ def LoadModel(full_model_location, model_weight_location, suffix):
   model.load_weights(model_weight_location + suffix)
   return model
 
+SampleStepWitness = namedtuple(
+        'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error', 'log_prob'])
+
 class DecoderTrain(object):
   def __init__(self, model):
     self._model = model
@@ -248,6 +251,93 @@ class MultiDiffusionModel:
 
     loss_diff, loss_diff_mse = self.diffusion_loss(t, f, x_mask, cond, training)
     return (loss_diff, loss_klz, loss_recon, loss_diff_mse, recon_diff)
+
+  def perfect_score(self, z_t, f, gamma):
+    a = self.alpha(gamma)
+    var = self.sigma2(gamma)
+    return tf.divide(z_t - a*f, tf.math.sqrt(var))
+
+  # Computes the PDF for sampling z at time t.
+  def log_prob(self, f, z_t, g_t):
+    alpha = self.alpha(g_t)
+    var = self.sigma2(g_t)
+
+    z_t_distribution = tfd.MultivariateNormalDiag(
+        loc=f*alpha, scale_diag=tf.math.sqrt(var)*tf.ones_like(f))
+    return tf.math.reduce_sum(z_t_distribution.log_prob(z_t))
+
+  def sample_step(self, i, T, z_t, cond, f):
+    eps = tf.random.normal(tf.shape(z_t))
+    t = tf.cast((T- i) / T, 'float32')
+    s = tf.cast((T- i) / T, 'float32')
+
+    g_s = self.gamma_scalar(s)
+    g_t = self.gamma_scalar(t)
+    sigma2_t = self.sigma2(g_t)
+    sigma2_s = self.sigma2(g_s)
+
+    sigma_t = tf.math.sqrt(sigma2_t)
+    sigma_s = tf.math.sqrt(sigma2_s)
+
+    alpha_t = self.alpha(g_t)
+    alpha_s = self.alpha(g_s)
+
+    alpha_t_s = alpha_t/alpha_s
+    sigma2_t_s = sigma2_t - tf.math.square(alpha_t_s)*sigma2_s
+
+    sigma2_q = sigma2_t_s * sigma2_s / sigma2_t
+
+    eps_hat_cond = self._scorer.score(z_t, g_t, cond, training=False)
+    x = (z_t -sigma_t*eps_hat_cond)/self.alpha(g_t)
+    z_s = ((alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t) +
+            tf.math.sqrt(sigma2_q) * eps)
+    true_eps = self.perfect_score(z_t, f, g_t)
+    wt = SampleStepWitness(
+        alpha=alpha_t,
+        ts=t,
+        sigma=sigma_t,
+        gamma_t=g_t,
+        gamma_s=g_s,
+        eps_avg_mag=tf.math.reduce_sum(tf.math.abs(true_eps)),
+        eps_relative_error=(
+          tf.math.reduce_sum(tf.math.abs(eps_hat_cond-true_eps))/
+          tf.math.reduce_sum(tf.math.abs(true_eps)))
+        error=tf.norm(z_s/alpha_s - f),
+        log_prob=self.log_prob(f, z_s, g_s))
+    return z_s, wt
+
+  def reconstruct(self, t, training_data):
+    # Compute x and teh conditioning.
+    x = training_data['normalized_coordinates']
+    cond = self._conditioner.conditioning(
+        training_data['residue_names'],
+        training_data['atom_names'], training=False)
+    # Encode x into the embedding space.
+    f = self._encoder.encode(x, cond, training=False)
+
+    # Introduce the error.
+    T = self._timesteps
+    tn = math.ceil(t * T)
+    t = tn / T
+    g_t = self.gamma_scalar(t)
+    eps = tf.random.normal(tf.shape(f))
+    z_with_error = self.variance_preserving_map(f, g_t, eps)
+    z_t = z_with_error
+
+    # Remove the error.
+    witnesses = []
+    for i in range(T-tn, T):
+      if i%100==0:
+        print('Reconstruct @', i)
+      z_t, w_t = self.sample_step(tf.constant(i), T, z_t, cond, f)
+      witnesses.append(wt)
+
+    # Decode from the embedding sapce.
+    g0 = self.gamma_scalar(0)
+    z_0_rescaled = z_t / self.alpha(g0)
+    return (self._decoder.decode(z_with_error/self.alpha(g_t, cond, training=False)),
+        self._decoder.decode(z_0_rescaled, cond, training=False),
+        f, z_with_error, z_t, witnesses)
 
   def save(self, location):
     self._decoder.save(location + '/decoder_model')
