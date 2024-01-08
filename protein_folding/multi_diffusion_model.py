@@ -301,7 +301,7 @@ class MultiDiffusionModel:
         eps_avg_mag=tf.math.reduce_sum(tf.math.abs(true_eps)),
         eps_relative_error=(
           tf.math.reduce_sum(tf.math.abs(eps_hat_cond-true_eps))/
-          tf.math.reduce_sum(tf.math.abs(true_eps)))
+          tf.math.reduce_sum(tf.math.abs(true_eps))),
         error=tf.norm(z_s/alpha_s - f),
         log_prob=self.log_prob(f, z_s, g_s))
     return z_s, wt
