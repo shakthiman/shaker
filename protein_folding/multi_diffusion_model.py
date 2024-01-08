@@ -343,7 +343,8 @@ class MultiDiffusionModel:
     # Decode from the embedding sapce.
     g0 = self.gamma_scalar(0)
     z_0_rescaled = z_t / self.alpha(g0)
-    return (self._decoder.decode(z_with_error/self.alpha(g_t, cond, training=False)),
+    return (self._decoder.decode(z_with_error/self.alpha(g_t), cond,
+        training=False),
         self._decoder.decode(z_0_rescaled, cond, training=False),
         f, z_with_error, z_t, witnesses)
 
