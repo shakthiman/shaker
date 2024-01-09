@@ -275,8 +275,8 @@ class MultiDiffusionModel:
 
   def sample_step(self, i, T, z_t, cond, f, f_mask):
     eps = tf.random.normal(tf.shape(z_t))
-    t = tf.cast((T- i) / T, 'float32')
-    s = tf.cast((T- i) / T, 'float32')
+    t = tf.cast((T - i) / T, 'float32')
+    s = tf.cast((T - i - 1) / T, 'float32')
 
     g_s = self.gamma_scalar(s)
     g_t = self.gamma_scalar(t)
