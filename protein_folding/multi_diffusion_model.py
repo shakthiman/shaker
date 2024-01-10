@@ -25,7 +25,7 @@ def LoadModel(full_model_location, model_weight_location, suffix):
   return model
 
 SampleStepWitness = namedtuple(
-        'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error', 'log_prob'])
+        'SampleStepWitness', ['alpha', 'ts', 'sigma', 'gamma_t', 'gamma_s', 'eps_avg_mag', 'eps_relative_error', 'error', 'relative_error', 'log_prob'])
 
 class DecoderTrain(object):
   def __init__(self, model):
@@ -310,6 +310,7 @@ class MultiDiffusionModel:
           tf.math.reduce_sum(tf.math.abs(eps_hat_cond-true_eps))/
           tf.math.reduce_sum(tf.math.abs(true_eps))),
         error=tf.norm(z_s/alpha_s - f),
+        relative_error=tf.norm(z_s/alpha_s - f)/tf.norm(f),
         log_prob=self.log_prob(f, z_s, g_s))
     return z_s, wt
 
