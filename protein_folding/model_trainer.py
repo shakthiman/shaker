@@ -31,7 +31,7 @@ def _MultiChainTrainStep(training_data, model, optimizer):
       ['encoder'] * len(model._encoder.trainable_weights()) +
       ['conditioner'] * len(model._conditioner.trainable_weights()) +
       ['scorer'] * len(model._scorer.trainable_weights()) +
-      ['gamma_model'] * len(model._gamma_model.trainable_weights()))
+      ['gamma_model'] * len(model._gamma_model.trainable_weights))
   grad_norm_by_source = {}
   for s, g in zip(sources, grads):
     if s in grad_norm_by_source:
