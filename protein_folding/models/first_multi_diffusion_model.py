@@ -239,11 +239,7 @@ def GammaModel():
   expanded_ts = tf.expand_dims(ts, -1)
   l1 = tf.keras.layers.Dense(
       1, kernel_constraint=tf.keras.constraints.NonNeg())
-  l2 = lambda x: tf.keras.layers.LeakyReLU(0.01)(
-          tf.keras.layers.Dense(512, kernel_constraint=tf.keras.constraints.NonNeg())(x))
-  l3 = tf.keras.layers.Dense(
-      1, kernel_constraint=tf.keras.constraints.NonNeg())
-  gamma = -1 * (l1(expanded_ts) + l3(l2(expanded_ts)) + expanded_ts)
+  gamma = -1 * (l1(expanded_ts) + expanded_ts)
   return tf.keras.Model(inputs=ts, outputs=tf.squeeze(gamma, -1))
 
 MODEL_FOR_TRAINING = lambda vocab: multi_diffusion_model.MultiDiffusionModel(
