@@ -139,7 +139,8 @@ def EncoderModel():
   return tf.keras.Model(inputs=[normalized_coordinates, cond],
       outputs=tf.keras.layers.Identity()(concatenate_inputs))
 
-def _ApplySharedTransformer(concatenated_features, z_mask, num_blocks):
+def _ApplySharedTransformer(concatenated_features, z_mask,
+    num_blocks, num_transformer_channels):
   # Straighten, Attend, and Reshape.
   original_shape = ShapeList(concatenated_features)
   assert len(original_shape) == 4
@@ -154,11 +155,13 @@ def _ApplySharedTransformer(concatenated_features, z_mask, num_blocks):
                        tf.stack([tf.constant(0), ideal_sequence_size-sequence_size]),
                        tf.constant([0, 0])])
   padded_features = tf.pad(straightened_features, paddings)
-  padded_features = tf.ensure_shape(padded_features, [None, None, 161])
+  padded_features = tf.ensure_shape(padded_features,
+      [None, None, num_transformer_channels])
   padded_mask = tf.pad(straightened_mask, tf.stack([
     tf.constant([0, 0]),
     tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
-  transformer_output = TransformerLayer(10, num_blocks, 5, 10, 5, 161, padded_features, padded_mask)
+  transformer_output = TransformerLayer(10, num_blocks, 5, 10, 5,
+      num_transformer_channels, padded_features, padded_mask)
   transformer_output = transformer_output[:,:sequence_size,:]
   transformer_output = tf.reshape(transformer_output,
       [original_shape[0], original_shape[1], original_shape[2], -1])
@@ -180,10 +183,15 @@ def DecoderModel():
   convolved_inputs = VectorizedMapLayer(conv_layer)(base_inputs)
   concatenated_inputs = tf.keras.layers.concatenate(inputs=[base_inputs, convolved_inputs])
 
+  transformer_output = _ApplySharedTransformer(
+      concatenated_inputs, z_mask, num_blocks, 151)
+
   scale_diag = tf.Variable(1.0)
-  loc = tf.keras.layers.Dense(3)(_ApplySharedTransformer(concatenated_inputs, z_mask, num_blocks)))
+  loc = tf.keras.layers.Dense(3)(tf.keras.layers.concatenate(
+    inputs=[concatenated_inputs, tf.ensure_shape(transformer_output,
+      [None, None, None, 151])]))
   return tf.keras.Model(
-      inputs=[z_0_rescaled, cond],
+      inputs=[z_0_rescaled, z_mask, cond],
       outputs=[loc, tf.keras.layers.Identity()(scale_diag*tf.ones_like(loc))])
 
 def CondModel(residue_lookup_size, atom_lookup_size):
@@ -232,7 +240,7 @@ def ScoreModel():
   concatenated_features = tf.keras.layers.concatenate(
       inputs=[base_features, convolved_features])
 
-  transformer_output = _ApplySharedTransformer(concatenated_features, z_mask, num_blocks)
+  transformer_output = _ApplySharedTransformer(concatenated_features, z_mask, num_blocks, 161)
   score = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
     inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 161])]))
 
@@ -246,7 +254,7 @@ def GammaModel():
   gamma = -1 * (l1(expanded_ts) + expanded_ts)
   return tf.keras.Model(inputs=ts, outputs=tf.squeeze(gamma, -1))
 
-MOREL_FOR_TRAINING = lambda vocab: multi_diffusion_model.MultiDiffusionModel(
+MODEL_FOR_TRAINING = lambda vocab: multi_diffusion_model.MultiDiffusionModel(
     GammaModel(), multi_diffusion_model.DecoderTrain(DecoderModel()),
     multi_diffusion_model.EncoderTrain(EncoderModel()),
     multi_diffusion_model.CondTrain(
