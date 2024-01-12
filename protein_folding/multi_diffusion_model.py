@@ -38,13 +38,16 @@ class DecoderTrain(object):
   #  z_0_rescaled: A tenstor for the latent distribution at step 0.
   #    Rescaled by alpha. z_0_rescaled should have dimensions:
   #      (batch_size, num_proteins, num_atoms, num_channels)
+  #   z_mask: A mask with shape
+  #     (batch_size, num_proteins, num_atoms, num_channels)
   #  cond: A tensor with context information. Should have dimensions:
   #      (batch_size, num_proteins, num_atoms, num_channels)
   #
   # Returns: A multivariate distibution on R^(batch_size X num_proteins X num_atoms)
-  def decode(self, z_0_rescaled, cond, training):
+  def decode(self, z_0_rescaled, z_mask, cond, training):
     outputs = self._model({
       'z_0_rescaled': z_0_rescaled,
+      'z_mask': z_mask,
       'cond': cond}, training=training)
     return tfd.MultivariateNormalDiag(
         loc=outputs[0], scale_diag=outputs[1])
@@ -192,7 +195,7 @@ class MultiDiffusionModel:
     eps_0 = tf.random.normal(tf.shape(f))
     z_0 = self.variance_preserving_map(f, g_0, eps_0)
     z_0_rescaled = z_0 / self.alpha(g_0)
-    prob_dist = self._decoder.decode(z_0_rescaled, cond, training)
+    prob_dist = self._decoder.decode(z_0_rescaled, f_mask, cond, training)
     loss_recon = -tf.reduce_sum(
       tf.math.multiply(prob_dist.log_prob(x), f_mask), axis=[-1, -2])
     return loss_recon, tf.reduce_sum(tf.math.multiply(
@@ -344,9 +347,10 @@ class MultiDiffusionModel:
     # Decode from the embedding sapce.
     g0 = self.gamma_scalar(0)
     z_0_rescaled = z_t / self.alpha(g0)
-    return (self._decoder.decode(z_with_error/self.alpha(g_t), cond,
+    x_mask = _XMask(x)
+    return (self._decoder.decode(z_with_error/self.alpha(g_t), x_mask, cond,
         training=False),
-        self._decoder.decode(z_0_rescaled, cond, training=False),
+        self._decoder.decode(z_0_rescaled, x_mask, cond, training=False),
         f, z_with_error, z_t, witnesses)
 
   def save(self, location):
