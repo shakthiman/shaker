@@ -190,7 +190,7 @@ class MultiDiffusionModel:
   def decoder_weights(self):
     return self._decoder.trainable_weights()
 
-  def recon_loss(self, x, f, f_mask, cond, training):
+  def recon_loss(self, x, f, f_mask, cond, training, normalize_by_num_atoms):
     g_0 = self.gamma_scalar(0.0)
     eps_0 = tf.random.normal(tf.shape(f))
     z_0 = self.variance_preserving_map(f, g_0, eps_0)
@@ -198,20 +198,25 @@ class MultiDiffusionModel:
     prob_dist = self._decoder.decode(z_0_rescaled, f_mask, cond, training)
     loss_recon = -tf.reduce_sum(
       tf.math.multiply(prob_dist.log_prob(x), f_mask), axis=[-1, -2])
+    if normalize_by_num_atoms:
+      loss_recon = loss_recon/tf.math.reduce_sum(f_mask, axis=[-1, -2])
     return loss_recon, tf.reduce_sum(tf.math.multiply(
       tf.math.abs(x-prob_dist.mean()),tf.expand_dims(f_mask, -1)))/tf.reduce_sum(f_mask)
 
-  def latent_loss(self, f, f_mask):
+  def latent_loss(self, f, f_mask, normalize_by_num_atoms):
     g_1 = self.gamma_scalar(1.0)
     var_1 = self.sigma2(g_1)
     mean1_sqr = (1. - var_1) * tf.square(f)
     loss_klz = 0.5 * tf.reduce_sum(
-    tf.math.multiply(mean1_sqr + var_1 - tf.math.log(var_1) - 1.,
-      tf.expand_dims(f_mask, -1)),
-      axis=[-1, -2, -3])
+        tf.math.multiply(mean1_sqr + var_1 - tf.math.log(var_1) - 1.,
+          tf.expand_dims(f_mask, -1)),
+        axis=[-1, -2, -3])
+    if normalize_by_num_atoms:
+      loss_klz = loss_klz/tf.math.reduce_sum(f_mask, axis=[-1, -2])
     return loss_klz
 
-  def diffusion_loss(self, t, f, f_mask, cond, training):
+  def diffusion_loss(self, t, f, f_mask, cond, training,
+      normalize_by_num_atoms):
     # sample z_t.
     g_t = self.gamma(t)
     eps = tf.random.normal(tf.shape(f))
@@ -228,9 +233,12 @@ class MultiDiffusionModel:
     s = t - (1.0/T)
     g_s = self.gamma(s)
     loss_diff = 0.5 * T * tf.math.expm1(g_s - g_t) * loss_diff_se
+    if normalize_by_num_atoms:
+      loss_diff = loss_diff/tf.math.reduce_sum(f_mask, axis=[-1, -2])
     return loss_diff, loss_diff_mse
 
-  def compute_model_loss(self, training_data, training=True):
+  def compute_model_loss(self, training_data, training=True,
+          normalize_by_num_atoms=False):
     x = training_data['normalized_coordinates']
     cond = self._conditioner.conditioning(
         training_data['residue_names'],
@@ -242,11 +250,20 @@ class MultiDiffusionModel:
     # add noise and reconstruct
     f = self._encoder.encode(x, cond, training)
     x_mask = _XMask(x)
-    loss_recon, recon_diff = self.recon_loss(x, f, x_mask, cond, training)
+    loss_recon, recon_diff = self.recon_loss(
+        x=x,
+        f=f,
+        f_mask=x_mask,
+        cond=cond,
+        training=training,
+        normalize_by_num_atoms=normalize_by_num_atoms)
 
     # 2. LATENT LOSS
     # KL z1 with N(0,1) prior
-    loss_klz = self.latent_loss(f, x_mask)
+    loss_klz = self.latent_loss(
+        f=f,
+        f_mask=x_mask,
+        normalize_by_num_atoms=normalize_by_num_atoms)
 
     # 3. Diffusion Loss.
     # Sample time steps.
@@ -259,7 +276,13 @@ class MultiDiffusionModel:
     T = self._timesteps
     t = tf.math.ceil(t*T) / T
 
-    loss_diff, loss_diff_mse = self.diffusion_loss(t, f, x_mask, cond, training)
+    loss_diff, loss_diff_mse = self.diffusion_loss(
+        t=t,
+        f=f,
+        f_mask=x_mask,
+        cond=cond,
+        training=training,
+        normalize_by_num_atoms=normalize_by_num_atoms)
     return (loss_diff, loss_klz, loss_recon, loss_diff_mse, recon_diff)
 
   def perfect_score(self, z_t, f, gamma):

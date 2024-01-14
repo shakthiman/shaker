@@ -16,9 +16,10 @@ def _SingleChainTrainStep(training_data, model, optimizer):
       tf.reduce_mean(loss_diff_mse), recon_diff)
 
 @tf.function(reduce_retracing=True)
-def _MultiChainTrainStep(training_data, model, optimizer):
+def _MultiChainTrainStep(training_data, model, optimizer, normalize_by_num_atoms):
   with tf.GradientTape() as tape:
-    l1, l2, l3, loss_diff_mse, recon_diff = model.compute_model_loss(training_data)
+    l1, l2, l3, loss_diff_mse, recon_diff = model.compute_model_loss(
+            training_data, training=True, normalize_by_num_atoms=normalize_by_num_atoms)
     loss = tf.reduce_mean(l1+l2+l3)
   trainable_weights = model.trainable_weights()
   grads = tape.gradient(loss, trainable_weights)
@@ -82,7 +83,8 @@ def TrainSingleChainModel(ds,
       model.save('{}/version_{}'.format(write_target, step))
 
 def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
-    save_frequency, pdb_vocab, model, optimizer, write_target, tensorboard_target):
+    save_frequency, pdb_vocab, model, optimizer, write_target, tensorboard_target,
+    normalize_by_num_atoms=False):
   summary_writer = tf.summary.create_file_writer(tensorboard_target)
   tds = ds.shuffle(shuffle_size).map(
       lambda x: {
@@ -97,7 +99,7 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
   cpu_step = 0
   for step, training_data in tds.enumerate():
     l1, l2, l3, loss_diff_mse, recon_diff, grad_norm, grad_norm_by_source = _MultiChainTrainStep(
-            training_data, model, optimizer)
+            training_data, model, optimizer, normalize_by_num_atoms)
     with summary_writer.as_default():
       tf.summary.scalar('l1_loss', l1, step=step)
       tf.summary.scalar('l2_loss', l2, step=step)
