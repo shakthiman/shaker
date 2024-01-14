@@ -151,7 +151,7 @@ class ScoreTrain(object):
 
 class MultiDiffusionModel:
   def __init__(self, gamma_model, decoder, encoder, conditioner, scorer):
-    self._timesteps = 10000
+    self._timesteps = 1000
 
     self._gamma_model = gamma_model
     self._decoder = decoder
