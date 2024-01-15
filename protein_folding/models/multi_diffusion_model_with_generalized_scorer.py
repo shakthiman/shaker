@@ -230,9 +230,9 @@ def ScoreModel():
   concatenated_features = tf.keras.layers.concatenate(
       inputs=[base_features, convolved_features])
 
-  transformer_output = _ApplySharedTransformer(concatenated_features, z_mask, num_blocks, 161)
+  transformer_output = _ApplySharedTransformer(concatenated_features, z_mask, num_blocks, 151)
   f = tf.keras.layers.Dense(Z_EMBEDDING_SIZE)(tf.keras.layers.concatenate(
-    inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 161])]))
+    inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 151])]))
 
   # Account for gamma.
   sigma2 = tf.math.sigmoid(-1*gamma)
