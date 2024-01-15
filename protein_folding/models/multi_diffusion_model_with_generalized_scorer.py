@@ -235,8 +235,8 @@ def ScoreModel():
     inputs=[concatenated_features, tf.ensure_shape(transformer_output, [None, None, None, 151])]))
 
   # Account for gamma.
-  gamma = tf.expand_dims(tf.expand_dims(tf.expand_dims(gamma, -1), -1), -1)
-  sigma2 = tf.math.sigmoid(-1*gamma)
+  gamma_e = tf.expand_dims(tf.expand_dims(tf.expand_dims(gamma, -1), -1), -1)
+  sigma2 = tf.math.sigmoid(-1*gamma_e)
   a = tf.math.sqrt(1-sigma2)
   var = sigma2
   score = tf.divide(z-a*f, tf.math.sqrt(var))
