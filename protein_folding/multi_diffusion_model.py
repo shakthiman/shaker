@@ -14,7 +14,7 @@ def _SaveWeights(model, location):
   model.save_weights(location, overwrite=True, save_format='tf',
       options=tf.train.CheckpointOptions())
 
-def _XMask(x):
+def XMask(x):
   return tf.cast(
       tf.math.reduce_any(
         tf.math.greater(tf.math.abs(x), 1e-6), axis=[-1]), tf.float32)
@@ -159,6 +159,9 @@ class MultiDiffusionModel:
     self._conditioner = conditioner
     self._scorer = scorer
 
+  def timesteps(self):
+      return self._timesteps
+
   def gamma(self, ts):
     return self._gamma_model(ts)
 
@@ -186,6 +189,9 @@ class MultiDiffusionModel:
         self._conditioner.trainable_weights() +
         self._scorer.trainable_weights() +
         list(self._gamma_model.trainable_variables))
+
+  def scorer_weights(self):
+    return self._scorer.trainable_weights()
 
   def decoder_weights(self):
     return self._decoder.trainable_weights()
@@ -215,6 +221,23 @@ class MultiDiffusionModel:
       loss_klz = loss_klz/tf.math.reduce_sum(f_mask, axis=[-1, -2])
     return loss_klz
 
+  def diffusion_loss_from_eps(self, eps, eps_hat, t, T, f_mask,
+      normalize_by_num_atoms):
+    loss_diff_se = tf.reduce_sum(
+        tf.math.multiply(
+          tf.square(eps - eps_hat),
+          tf.expand_dims(f_mask, -1)), axis=[-1, -2, -3])
+    loss_diff_mse = tf.reduce_sum(loss_diff_se)/tf.reduce_sum(f_mask)
+
+    # Loss for finite depth T, i.e. discrete time.
+    s = t - (1.0/T)
+    g_t = self.gamma(t)
+    g_s = self.gamma(s)
+    loss_diff = 0.5 * T * tf.math.expm1(g_s - g_t) * loss_diff_se
+    if normalize_by_num_atoms:
+      loss_diff = loss_diff/tf.math.reduce_sum(f_mask, axis=[-1, -2])
+    return loss_diff, loss_diff_mse
+
   def diffusion_loss(self, t, f, f_mask, cond, training,
       normalize_by_num_atoms):
     # sample z_t.
@@ -223,19 +246,31 @@ class MultiDiffusionModel:
     z_t = self.variance_preserving_map(f, g_t, eps)
     # compute predicted noise
     eps_hat = self._scorer.score(z_t, f_mask, g_t, cond, training)
-    # MSE of predicted noise
-    loss_diff_se = tf.reduce_sum(
-        tf.math.multiply(tf.square(eps - eps_hat), tf.expand_dims(f_mask, -1)), axis=[-1, -2, -3])
-    loss_diff_mse = tf.reduce_sum(loss_diff_se)/tf.reduce_sum(f_mask)
-
-    # loss for finite depth T, i.e. discrete time
     T = self._timesteps
-    s = t - (1.0/T)
-    g_s = self.gamma(s)
-    loss_diff = 0.5 * T * tf.math.expm1(g_s - g_t) * loss_diff_se
-    if normalize_by_num_atoms:
-      loss_diff = loss_diff/tf.math.reduce_sum(f_mask, axis=[-1, -2])
-    return loss_diff, loss_diff_mse
+    return self.diffusion_loss_from_eps(
+        eps=eps,
+        eps_hat=eps_hat,
+        t=t,
+        T=T,
+        f_mask=f_mask,
+        normalize_by_num_atoms=normalize_by_num_atoms)
+
+  def conditioning(self, training_data, training=True):
+    return self._conditioner.conditioning(
+        training_data['residue_names'],
+        training_data['atom_names'], training=training)
+
+  def encode(self, training_data, cond, training=True):
+    return self._encoder.encode(
+        training_data['normalized_coordinates'], cond, training=training)
+
+  def score(self, z_t, z_mask, gamma, cond, training=True):
+    return self._scorer.score(
+        z_t=z_t,
+        z_mask=z_mask,
+        gamma=gamma,
+        cond=cond,
+        training=training)
 
   def compute_model_loss(self, training_data, training=True,
           normalize_by_num_atoms=False):
@@ -249,7 +284,7 @@ class MultiDiffusionModel:
     # 1. RECONSTRUCTION LOSS
     # add noise and reconstruct
     f = self._encoder.encode(x, cond, training)
-    x_mask = _XMask(x)
+    x_mask = XMask(x)
     loss_recon, recon_diff = self.recon_loss(
         x=x,
         f=f,
@@ -289,6 +324,41 @@ class MultiDiffusionModel:
     a = self.alpha(gamma)
     var = self.sigma2(gamma)
     return tf.divide(z_t - a*f, tf.math.sqrt(var))
+
+  def perfect_score_vec(self, z_t, f, gamma):
+    a = tf.expand_dims(tf.expand_dims(tf.expand_dims(
+      self.alpha(gamma), -1), -1), -1)
+    var = tf.expand_dims(tf.expand_dims(tf.expand_dims(
+      self.sigma2(gamma), -1), -1), -1)
+    return tf.divide(z_t - a*f, tf.math.sqrt(var))
+
+  def sample_step_vec(self, t, s, z_t, cond, f):
+    eps = tf.random.normal(tf.shape(z_t))
+
+    g_s = self.gamma(s)
+    g_t = self.gamma(t)
+    sigma2_t = tf.expand_dims(tf.expand_dims(tf.expand_dims(
+      self.sigma2(g_t), -1), -1), -1)
+    sigma2_s = tf.expand_dims(tf.expand_dims(tf.expand_dims(
+      self.sigma2(g_s), -1), -1), -1)
+
+    sigma_t = tf.math.sqrt(sigma2_t)
+    sigma_s = tf.math.sqrt(sigma2_s)
+
+    alpha_t = tf.expand_dims(tf.expand_dims(tf.expand_dims(
+      self.alpha(g_t), -1), -1), -1)
+    alpha_s = tf.expand_dims(tf.expand_dims(tf.expand_dims(
+      self.alpha(g_s), -1), -1), -1)
+
+    alpha_t_s = alpha_t / alpha_s
+    sigma2_t_s = sigma2_t - tf.math.square(alpha_t_s)*sigma2_s
+
+    sigma2_q = sigma2_t_s * sigma2_s / sigma2_t
+    eps_hat_cond = self._scorer.score(z_t, g_t, cond, training=False)
+    x = (z_t - sigma_t*eps_hat_cond)/alpha_t
+    z_s = ((alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t) +
+            tf.math.sqrt(sigma2_q) * eps)
+    return z_s
 
   # Computes the PDF for sampling z at time t.
   def log_prob(self, f, z_t, g_t):
@@ -364,13 +434,13 @@ class MultiDiffusionModel:
       if i%100==0:
         print('Reconstruct @', i)
       z_t, wt = self.sample_step(tf.constant(i), T, z_t, cond, f,
-          _XMask(x))
+          XMask(x))
       witnesses.append(wt)
 
     # Decode from the embedding sapce.
     g0 = self.gamma_scalar(0)
     z_0_rescaled = z_t / self.alpha(g0)
-    x_mask = _XMask(x)
+    x_mask = XMask(x)
     return (self._decoder.decode(z_with_error/self.alpha(g_t), x_mask, cond,
         training=False),
         self._decoder.decode(z_0_rescaled, x_mask, cond, training=False),
