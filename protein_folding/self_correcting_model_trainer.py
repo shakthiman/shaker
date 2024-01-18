@@ -112,7 +112,7 @@ def _train_step(base_model, train_model, training_data):
 def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
     save_frequency, pdb_vocab, base_model, train_model, optimizer,
     write_target, tensorboard_target):
-  summary_writer = tf.summary().create_file_writer(tensorboard_target)
+  summary_writer = tf.summary.create_file_writer(tensorboard_target)
   tds = ds.shuffle(shuffle_size).map(
       lambda x: {
         'residue_names': pdb_vocab.GetResidueNamesId(x['resname'].to_tensor()),
