@@ -45,6 +45,7 @@ def _TrainingSamples(base_model, f, cond, t, T, steps):
       g_t_1=tf.concat(g_t_1s, 0),
       eps_t=tf.concat(eps_ts, 0))
 
+@tf.function(reduce_retracing=True)
 def _train_step(base_model, train_model, training_data):
   x = training_data['normalized_coordinates']
   x_mask = multi_diffusion_model.XMask(x)
@@ -94,7 +95,7 @@ def _train_step(base_model, train_model, training_data):
               z_mask=small_z_mask,
               gamma=smaller_sample.g_t,
               cond=small_conds,
-              training=False)
+              training=True)
       loss_diff, loss_diff_mse = train_model.diffusion_loss_from_eps(
               eps=smaller_sample.eps_t,
               eps_hat=eps_hat,
