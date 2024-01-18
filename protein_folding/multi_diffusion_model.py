@@ -332,7 +332,7 @@ class MultiDiffusionModel:
       self.sigma2(gamma), -1), -1), -1)
     return tf.divide(z_t - a*f, tf.math.sqrt(var))
 
-  def sample_step_vec(self, t, s, z_t, cond, f):
+  def sample_step_vec(self, t, s, z_t, cond, f_mask):
     eps = tf.random.normal(tf.shape(z_t))
 
     g_s = self.gamma(s)
@@ -354,7 +354,7 @@ class MultiDiffusionModel:
     sigma2_t_s = sigma2_t - tf.math.square(alpha_t_s)*sigma2_s
 
     sigma2_q = sigma2_t_s * sigma2_s / sigma2_t
-    eps_hat_cond = self._scorer.score(z_t, g_t, cond, training=False)
+    eps_hat_cond = self._scorer.score(z_t, f_mask, g_t, cond, training=False)
     x = (z_t - sigma_t*eps_hat_cond)/alpha_t
     z_s = ((alpha_t_s * sigma2_s * z_t / sigma2_t) + (alpha_s * sigma2_t_s * x /sigma2_t) +
             tf.math.sqrt(sigma2_q) * eps)

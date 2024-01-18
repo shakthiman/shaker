@@ -7,7 +7,7 @@ import functools
 TrainingSample = collections.namedtuple(
     'TrainingSample', ['z_t', 'g_t', 't', 'g_t_1', 'eps_t'])
 
-def _TrainingSamples(base_model, f, cond, t, T, steps):
+def _TrainingSamples(base_model, f, f_mask, cond, t, T, steps):
   g_t = base_model.gamma(t)
   g_t_1 = base_model.gamma(t - (1.0/T))
   eps = tf.random.normal(tf.shape(f))
@@ -27,7 +27,7 @@ def _TrainingSamples(base_model, f, cond, t, T, steps):
 
     s = s - step
     # Simulate forward one step.
-    z_s = base_model.sample_step_vec(t, s, z_t, cond)
+    z_s = base_model.sample_step_vec(t, s, z_t, cond, f_mask)
     g_s = base_model.gamma(s)
     g_s_1 = base_model.gamma(s -(1.0/T))
     eps_s = base_model.perfect_score_vec(z_s, f, g_s)
@@ -64,7 +64,7 @@ def _train_step(base_model, train_model, training_data):
       (_GetTs(0.0, 1.0), [])]
 
   training_samples = [
-      _TrainingSamples(base_model, f, cond, t, train_model.timesteps(), s)
+      _TrainingSamples(base_model, f, x_mask, cond, t, train_model.timesteps(), s)
       for t,s in ts_and_steps]
 
   training_sample = TrainingSample(
