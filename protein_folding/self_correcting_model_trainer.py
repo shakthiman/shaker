@@ -46,7 +46,7 @@ def _TrainingSamples(base_model, f, f_mask, cond, t, T, steps):
       eps_t=tf.concat(eps_ts, 0))
 
 @tf.function(reduce_retracing=True)
-def _train_step(base_model, train_model, training_data):
+def _train_step(base_model, train_model, training_data, optimizer):
   x = training_data['normalized_coordinates']
   x_mask = multi_diffusion_model.XMask(x)
   cond = base_model.conditioning(training_data, training=False)
@@ -126,7 +126,7 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
               'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
   cpu_step = 0
   for step, training_data in tds.enumerate():
-    loss, loss_diff_mse, grad_norm = _train_step(base_model, model, training_data)
+    loss, loss_diff_mse, grad_norm = _train_step(base_model, train_model, training_data, optimizer)
     with summary_writer.as_default():
       tf.summary.scalar('loss', loss, step=step)
       tf.summary.scalar('loss_diff_mse', loss_diff_mse, step=step)
