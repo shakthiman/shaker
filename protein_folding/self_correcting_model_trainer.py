@@ -59,7 +59,6 @@ def _train_step(base_model, train_model, training_data, optimizer):
       dtype='float32'), max_val-min_val) + min_val
 
   ts_and_steps = [
-      (_GetTs(0.9, 1.0), [0.1]*9),
       (_GetTs(0.5, 1.0), [0.1]*5),
       (_GetTs(0.0, 1.0), [])]
 
@@ -75,10 +74,10 @@ def _train_step(base_model, train_model, training_data, optimizer):
       eps_t=tf.concat([ts.eps_t for ts in training_samples], 0))
 
   batch_indxs = tf.random.shuffle(tf.range(tf.shape(training_sample.z_t)[0]))
-  x_masks = tf.concat([x_mask]*(10 + 6 + 1), 0)
-  conds = tf.concat([cond]*(10 + 6 + 1), 0)
+  x_masks = tf.concat([x_mask]*(6 + 1), 0)
+  conds = tf.concat([cond]*(6 + 1), 0)
 
-  split_indx = tf.split(batch_indxs, 17)
+  split_indx = tf.split(batch_indxs, 7)
 
   for split in split_indx:
     with tf.GradientTape() as tape:
@@ -127,6 +126,7 @@ def TrainMultiChainModel(ds, shuffle_size, batch_size, prefetch_size,
   cpu_step = 0
   for step, training_data in tds.enumerate():
     loss, loss_diff_mse, grad_norm = _train_step(base_model, train_model, training_data, optimizer)
+    print(cpu_step)
     with summary_writer.as_default():
       tf.summary.scalar('loss', loss, step=step)
       tf.summary.scalar('loss_diff_mse', loss_diff_mse, step=step)
