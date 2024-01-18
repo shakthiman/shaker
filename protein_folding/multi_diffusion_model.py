@@ -266,7 +266,7 @@ class MultiDiffusionModel:
 
   def score(self, z_t, z_mask, gamma, cond, training=True):
     return self._scorer.score(
-        z_t=z_t,
+        z=z_t,
         z_mask=z_mask,
         gamma=gamma,
         cond=cond,
