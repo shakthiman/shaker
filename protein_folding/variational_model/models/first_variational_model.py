@@ -144,7 +144,7 @@ def EncoderModel():
       name='normalized_coordinates')
   atom_mask = tf.keras.Input(
       shape=[None, None],
-      'atom_mask')
+      name='atom_mask')
   cond = tf.keras.Input(
       shape=[None, None, _COND_EMBEDDING_SIZE],
       name='cond')
@@ -156,14 +156,16 @@ def EncoderModel():
   base_features = tf.keras.layers.concatenate(
       inputs=[normalized_coordinates, cond])
   transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 121)
+      base_features, atom_mask, num_blocks, 9)
+  transformer_output = tf.ensure_shape(
+      transformer_output, [None, None, None, 9])
 
   # Have each atom vote on z. 
   z = tf.keras.layers.Dense(2*_LATENT_EMBEDDING_SIZE)(transformer_output)
   straightened_z = StraightenMultipeptideSequence(z)
   straighted_atom_mask = StraightenMultipeptideMask(atom_mask)
   average_z = tf.math.reduce_sum(straightened_z, axis=1)/tf.math.reduce_sum(
-      straighted_atom_mask, axis=1)
+      straighted_atom_mask, axis=1, keepdims=True)
   return tf.keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
       outputs=average_z)
@@ -173,7 +175,7 @@ def DecoderModel():
   z = tf.keras.Input(shape=[_LATENT_EMBEDDING_SIZE], name='z')
   atom_mask = tf.keras.Input(
       shape=[None, None],
-      'atom_mask')
+      name='atom_mask')
   cond = tf.keras.Input(
       shape=[None, None, _COND_EMBEDDING_SIZE],
       name='cond')
@@ -184,9 +186,12 @@ def DecoderModel():
   num_blocks = 200
   base_features = tf.keras.layers.concatenate(
       inputs=[
-        tf.expand_dims(tf.expand_dims(z, 1), 1) * tf.ones_like(cond), cond])
+        tf.expand_dims(tf.expand_dims(z, 1), 1) * tf.ones(
+            ShapeList(cond)[:-1] + [_LATENT_EMBEDDING_SIZE]), cond])
   transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 131)
+      base_features, atom_mask, num_blocks, 18)
+  transformer_output = tf.ensure_shape(
+      transformer_output, [None, None, None, 18])
   loc = tf.keras.layers.Dense(3)(transformer_output)
   scale_diag = tf.Variable(1.0)
   return tf.keras.Model(

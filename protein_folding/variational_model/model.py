@@ -3,6 +3,8 @@ import tensorflow_probability as tfp
 
 import numpy as np
 
+tfd = tfp.distributions
+
 def _XMask(x):
     return tf.cast(
             tf.math.reduce_any(
@@ -27,7 +29,7 @@ class Decoder(object):
   def decode(self, z, atom_mask, cond, training):
     outputs = self._model({
       'z': z,
-      'atom_mask', atom_mask,
+      'atom_mask': atom_mask,
       'cond': cond}, training=training)
     return tfd.MultivariateNormalDiag(
         loc=outputs[0], scale_diag=outputs[1])
@@ -52,6 +54,7 @@ class Encoder(object):
     return tf.split(
         self._model({
           'normalized_coordinates': normalized_coordinates,
+          'atom_mask': atom_mask,
           'cond': cond}, training=training), num_or_size_splits=2, axis=1)
 
   # Reparametrizes mean and logvar to z.
@@ -68,10 +71,10 @@ class VariationalModel(object):
     self._decoder = decoder
     self._encoder = encoder
 
-  def _log_normal_pdf(sample, mean, log_var, raxis=[1]):
+  def _log_normal_pdf(self, sample, mean, logvar, raxis=[1]):
     log2pi = tf.math.log(2. * np.pi)
     return tf.reduce_sum(
-        -0.5*((sample-mean)**2. * tf.exp(-log_var) + logvar + log2pi),
+        -0.5*((sample-mean)**2. * tf.exp(-logvar) + logvar + log2pi),
         axis=raxis)
 
   def trainable_weights(self):
@@ -94,6 +97,6 @@ class VariationalModel(object):
             tf.math.multiply(
                 x.log_prob(training_data['normalized_coordinates']),
                 atom_mask), axis=[-1, -2])
-    logpz = _log_normal_pdf(z, 0., 0.)
-    logqz_x = _log_normal_pdf(z, mean, logvar)
+    logpz = self._log_normal_pdf(z, 0., 0.)
+    logqz_x = self._log_normal_pdf(z, mean, logvar)
     return -tf.reduce_mean(logpx_z + logpz - logqz_x)
