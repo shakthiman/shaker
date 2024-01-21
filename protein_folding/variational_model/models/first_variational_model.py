@@ -161,14 +161,16 @@ def EncoderModel():
       transformer_output, [None, None, None, 9])
 
   # Have each atom vote on z. 
-  z = tf.keras.layers.Dense(2*_LATENT_EMBEDDING_SIZE)(transformer_output)
+  z = tf.keras.layers.Dense(_LATENT_EMBEDDING_SIZE)(transformer_output)
   straightened_z = StraightenMultipeptideSequence(z)
   straighted_atom_mask = StraightenMultipeptideMask(atom_mask)
   average_z = tf.math.reduce_sum(straightened_z, axis=1)/tf.math.reduce_sum(
       straighted_atom_mask, axis=1, keepdims=True)
+  logvar = tf.Variable(1.0)
   return tf.keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
-      outputs=average_z)
+      outputs=tf.keras.layers.concatenate(inputs=
+          [average_z, logvar*tf.ones_like(average_z)]))
 
 def DecoderModel():
   # The inputs.

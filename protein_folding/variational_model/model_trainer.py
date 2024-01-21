@@ -15,10 +15,10 @@ def _TrainStep(model, optimizer, training_data):
   optimizer.apply_gradients(zip(grads, trainable_weights))
   grad_norm = functools.reduce(
       lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
-  sources = [
+  sources = (
       ['conditioner'] * len(model._conditioner.trainable_weights()) +
       ['decoder'] * len(model._decoder.trainable_weights()) +
-      ['encoder'] * len(model._encoder.trainable_weights())]
+      ['encoder'] * len(model._encoder.trainable_weights()))
   grad_norm_by_source = {}
   for s,g in zip(sources, grads):
     if s in grad_norm_by_source:
@@ -29,7 +29,7 @@ def _TrainStep(model, optimizer, training_data):
   return TrainStepInformation(
           loss_information=loss_information,
           grad_norm=grad_norm,
-          grad_norm_by_source)
+          grad_norm_by_source=grad_norm_by_source)
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
@@ -55,7 +55,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
       tf.summary.scalar('logqz_x', train_step_information.loss_information.logqz_x, step=step)
       tf.summary.scalar('diff_mae', train_step_information.loss_information.diff_mae, step=step)
       tf.summary.scalar('grad_norm', train_step_information.grad_norm, step=step)
-      for s, g in grad_norm_by_source.items():
+      for s, g in train_step_information.grad_norm_by_source.items():
         tf.summary.scalar('grad_norm_by_source_' + s, g, step=step)
     if cpu_step == 0:
         model.save('{}/version_{}'.format(write_target, cpu_step))
