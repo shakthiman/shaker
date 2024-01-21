@@ -1,9 +1,19 @@
+import collections
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 
 import numpy as np
 
 tfd = tfp.distributions
+
+def _SaveModel(model, location):
+  model.save(location, overwrite=True, save_format='tf',
+      options=tf.saved_model.SaveOptions())
+
+def _SaveWeights(model, location):
+  model.save_weights(location, overwrite=True, save_format='tf',
+      options=tf.train.CheckpointOptions())
 
 def _XMask(x):
     return tf.cast(
@@ -22,6 +32,12 @@ class Conditioner(object):
   def trainable_weights(self):
     return self._model.trainable_weights
 
+  def save(self, location):
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
+
 class Decoder(object):
   def  __init__(self, model):
     self._model = model
@@ -36,6 +52,12 @@ class Decoder(object):
 
   def trainable_weights(self):
     return self._model.trainable_weights
+
+  def save(self, location):
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
 
 class Encoder(object):
   def __init__(self, model):
@@ -65,6 +87,14 @@ class Encoder(object):
   def trainable_weights(self):
     return self._model.trainable_weights
 
+  def save(self, location):
+    _SaveModel(self._model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._model, location)
+
+LossInformation = collections.namedtuple(
+    'LossInformation', ['loss', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae'])
 class VariationalModel(object):
   def __init__(self, conditioner, decoder, encoder):
     self._conditioner = conditioner
@@ -99,4 +129,20 @@ class VariationalModel(object):
                 atom_mask), axis=[-1, -2])
     logpz = self._log_normal_pdf(z, 0., 0.)
     logqz_x = self._log_normal_pdf(z, mean, logvar)
-    return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+    diff_mae = tf.math.reduce_mean(tf.math.abs(training_data['normalized_coordinates'] - x.mean()))
+    return LossInformation(
+        loss=-tf.reduce_mean(logpx_z + logpz - logqz_x),
+        logpx_z=tf.reduce_mean(logpx_z),
+        logpz=tf.reduce_mean(logpz),
+        logqz_x=tf.reduce_mean(logqz_x),
+        diff_mae=diff_mae)
+
+  def save(self, location):
+    self._conditioner.save(location + '/conditioner')
+    self._decoder.save(location + '/decoder')
+    self._encoder.save(location + '/encoder')
+  
+  def save_weights(self, location):
+    self._conditioner.save_weights(location + '/conditioner')
+    self._decoder.save_weights(location + '/decoder')
+    self._encoder.save_weights(location + '/encoder')
