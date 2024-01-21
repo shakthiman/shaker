@@ -129,7 +129,11 @@ class VariationalModel(object):
                 atom_mask), axis=[-1, -2])
     logpz = self._log_normal_pdf(z, 0., 0.)
     logqz_x = self._log_normal_pdf(z, mean, logvar)
-    diff_mae = tf.math.reduce_mean(tf.math.abs(training_data['normalized_coordinates'] - x.mean()))
+    diff_mae = tf.math.reduce_sum(
+            tf.math.multiply(
+                tf.math.abs(training_data['normalized_coordinates'] - x.mean()),
+                atom_mask))/tf.math.reduce_sum(atom_mask)
+
     return LossInformation(
         loss=-tf.reduce_mean(logpx_z + logpz - logqz_x),
         logpx_z=tf.reduce_mean(logpx_z),
