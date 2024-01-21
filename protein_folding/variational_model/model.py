@@ -132,7 +132,7 @@ class VariationalModel(object):
     diff_mae = tf.math.reduce_sum(
             tf.math.multiply(
                 tf.math.abs(training_data['normalized_coordinates'] - x.mean()),
-                atom_mask))/tf.math.reduce_sum(atom_mask)
+                tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
 
     return LossInformation(
         loss=-tf.reduce_mean(logpx_z + logpz - logqz_x),
