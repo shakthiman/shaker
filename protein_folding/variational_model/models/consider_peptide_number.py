@@ -164,9 +164,9 @@ def EncoderModel():
   base_features = tf.keras.layers.concatenate(
       inputs=[normalized_coordinates, cond, peptide_indx])
   transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 9)
+      base_features, atom_mask, num_blocks, 10)
   transformer_output = tf.ensure_shape(
-      transformer_output, [None, None, None, 9])
+      transformer_output, [None, None, None, 10])
 
   # Have each atom vote on z. 
   z = tf.keras.layers.Dense(_LATENT_EMBEDDING_SIZE)(transformer_output)
@@ -200,9 +200,9 @@ def DecoderModel():
         tf.expand_dims(tf.expand_dims(z, 1), 1) * tf.ones(
             ShapeList(cond)[:-1] + [_LATENT_EMBEDDING_SIZE]), cond, peptide_indx])
   transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 18)
+      base_features, atom_mask, num_blocks, 19)
   transformer_output = tf.ensure_shape(
-      transformer_output, [None, None, None, 18])
+      transformer_output, [None, None, None, 19])
   loc = tf.keras.layers.Dense(3)(transformer_output)
   scale_diag = tf.Variable(1.0)
   return tf.keras.Model(
