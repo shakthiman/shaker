@@ -3,7 +3,7 @@ import tensorflow as tf
 from protein_folding.variational_model import model
 
 _COND_EMBEDDING_SIZE = 6
-_LATENT_EMBEDDING_SIZE = 12
+_LATENT_EMBEDDING_SIZE = 128
 _AMINO_ACID_EMBEDDING_DIMS = 20
 
 def ShapeList(x):
