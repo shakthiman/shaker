@@ -94,7 +94,7 @@ class Encoder(object):
     _SaveWeights(self._model, location)
 
 LossInformation = collections.namedtuple(
-    'LossInformation', ['loss', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae'])
+    'LossInformation', ['loss', 'loss_beta_1', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae'])
 class VariationalModel(object):
   def __init__(self, conditioner, decoder, encoder):
     self._conditioner = conditioner
@@ -113,7 +113,7 @@ class VariationalModel(object):
         self._decoder.trainable_weights() +
         self._encoder.trainable_weights())
 
-  def compute_loss(self, training_data, training):
+  def compute_loss(self, training_data, training, beta=1.0):
     atom_mask = _XMask(training_data['normalized_coordinates'])
     cond = self._conditioner.conditioning(
         training_data['residue_names'], training_data['atom_names'], training)
@@ -135,7 +135,8 @@ class VariationalModel(object):
                 tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
 
     return LossInformation(
-        loss=-tf.reduce_mean(logpx_z + logpz - logqz_x),
+        loss=-tf.reduce_mean(logpx_z + beta*(logpz - logqz_x)),
+        loss_beta_1 = -tf.reduce_mean(logpx_z + logpz - logqz_x),
         logpx_z=tf.reduce_mean(logpx_z),
         logpz=tf.reduce_mean(logpz),
         logqz_x=tf.reduce_mean(logqz_x),
