@@ -171,9 +171,9 @@ def EncoderModel():
   # Have each atom vote on z. 
   straightened_transformer_output = StraightenMultipeptideSequence(transformer_output)
   straighted_atom_mask = StraightenMultipeptideMask(atom_mask)
-  z = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(_LATENT_EMBEDDING_SIZE))(
+  z = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(_LATENT_EMBEDDING_SIZE//2))(
           inputs=straightened_transformer_output,
-          mask=straighted_atom_mask)
+          mask=tf.cast(straighted_atom_mask, tf.bool))
   logvar = tf.Variable(1.0)
   return tf.keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
