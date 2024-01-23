@@ -56,7 +56,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
       beta = 1.0
     if not adjust_beta:
       beta = 1.0
-    train_step_information = _TrainStep(model, optimizer, training_data, beta)
+    train_step_information = _TrainStep(model, optimizer, training_data, tf.constant(beta))
     with summary_writer.as_default():
       tf.summary.scalar('loss', train_step_information.loss_information.loss, step=step)
       tf.summary.scalar('loss_beta_1', train_step_information.loss_information.loss_beta_1, step=step)
