@@ -200,9 +200,9 @@ def DecoderModel():
         tf.expand_dims(tf.expand_dims(z, 1), 1) * tf.ones(
             ShapeList(cond)[:-1] + [_LATENT_EMBEDDING_SIZE]), cond, peptide_indx])
   transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 135)
+      base_features, atom_mask, num_blocks, 1031)
   transformer_output = tf.ensure_shape(
-      transformer_output, [None, None, None, 135])
+      transformer_output, [None, None, None, 1031])
   loc = tf.keras.layers.Dense(3)(transformer_output)
   scale_diag = tf.Variable(1.0)
   return tf.keras.Model(
