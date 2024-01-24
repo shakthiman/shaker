@@ -36,7 +36,7 @@ def _TrainStep(model, optimizer, training_data, beta):
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
-    tensorboard_target, adjust_beta=False):
+    tensorboard_target, beta_fn=lambda cpu_step: 1):
   summary_writer = tf.summary.create_file_writer(tensorboard_target)
   tds = ds.shuffle(shuffle_size).map(
       lambda x: {
@@ -49,13 +49,8 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
               'atom_names': [None, None],
               'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
   cpu_step = 0
-  beta = 0.0
   for step, training_data in tds.enumerate():
-    beta += 1e-4
-    if beta>1.0:
-      beta = 1.0
-    if not adjust_beta:
-      beta = 1.0
+    beta = beta_fn(cpu_step)
     train_step_information = _TrainStep(model, optimizer, training_data, tf.constant(beta))
     with summary_writer.as_default():
       tf.summary.scalar('loss', train_step_information.loss_information.loss, step=step)
