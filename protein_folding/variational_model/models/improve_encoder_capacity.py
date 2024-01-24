@@ -164,7 +164,7 @@ def EncoderModel():
   base_features = tf.keras.layers.concatenate(
       inputs=[
           normalized_coordinates, cond, peptide_indx,
-          tf.zeros(ShapeList(peptide_indx) + [_LATENT_EMBEDDING_SIZE - 10])])
+          tf.zeros(ShapeList(peptide_indx)[:-1] + [_LATENT_EMBEDDING_SIZE - 10])])
   transformer_output = _ApplySharedTransformer(
       base_features, atom_mask, num_blocks, _LATENT_EMBEDDING_SIZE)
   transformer_output = tf.ensure_shape(
