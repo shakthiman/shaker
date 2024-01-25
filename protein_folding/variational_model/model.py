@@ -105,7 +105,7 @@ class VariationalModel(object):
     log2pi = tf.math.log(2. * np.pi)
     return tf.reduce_sum(
         -0.5*((sample-mean)**2. * tf.exp(-logvar) + logvar + log2pi),
-        axis=list(range(1, len(mean.get_shape().as_list()))))
+        axis=list(range(1, len(sample.get_shape().as_list()))))
 
   def trainable_weights(self):
     return (
