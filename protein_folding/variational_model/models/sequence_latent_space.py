@@ -177,7 +177,7 @@ def EncoderModel():
 
 def DecoderModel():
   # The inputs.
-  z = tf.keras.Input(shape=[_LATENT_EMBEDDING_SIZE], name='z')
+  z = tf.keras.Input(shape=[None, None, _LATENT_EMBEDDING_SIZE], name='z')
   atom_mask = tf.keras.Input(
       shape=[None, None],
       name='atom_mask')
