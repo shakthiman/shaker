@@ -101,11 +101,11 @@ class VariationalModel(object):
     self._decoder = decoder
     self._encoder = encoder
 
-  def _log_normal_pdf(self, sample, mean, logvar, raxis=[1]):
+  def _log_normal_pdf(self, sample, mean, logvar):
     log2pi = tf.math.log(2. * np.pi)
     return tf.reduce_sum(
         -0.5*((sample-mean)**2. * tf.exp(-logvar) + logvar + log2pi),
-        axis=list(range(1, len(tf.shape().as_list()))))
+        axis=list(range(1, len(tf.shape(mean).as_list()))))
 
   def trainable_weights(self):
     return (
