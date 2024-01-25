@@ -173,7 +173,7 @@ def EncoderModel():
   return tf.keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
       outputs=tf.keras.layers.concatenate(inputs=
-          [transformer_output, logvar*tf.ones_like(transformer_output)]))
+          [transformer_output, logvar*tf.ones_like(transformer_output)], axis=1))
 
 def DecoderModel():
   # The inputs.
