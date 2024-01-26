@@ -153,13 +153,21 @@ def sigma2(gamma):
 def alpha(gamma):
   return tf.math.sqrt(1-sigma2(gamma))
 
+class ConstantValue(tf.keras.layers.Layer):
+  def __init__(self, name, initial_value):
+    super(ConstantValue, self).__init__()
+    self._constant_value = tf.Variable(initial_value, name=name)
+
+  def call(self):
+    return self._constant_value
+
 def EncoderModel():
   # The inputs.
   normalized_coordinates = tf.keras.Input(
       shape=[None, None, 3],
       name='normalized_coordinates')
 
-  gamma = tf.Variable(6.0)
+  gamma = ConstantValue('gamma', 6.0)()
   a = alpha(gamma)
   logvar = log_sigma2(gamma)
   return tf.keras.Model(
@@ -190,7 +198,7 @@ def DecoderModel():
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 10])
   loc = tf.keras.layers.Dense(3)(transformer_output)
-  scale_diag = tf.Variable(1.0)
+  scale_diag = ConstantValue('gamma', 1.0)()
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
       outputs=[loc, scale_diag*tf.ones_like(loc)])
