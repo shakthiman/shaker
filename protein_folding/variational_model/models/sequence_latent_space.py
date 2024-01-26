@@ -3,7 +3,7 @@ import tensorflow as tf
 from protein_folding.variational_model import model
 
 _COND_EMBEDDING_SIZE = 6
-_LATENT_EMBEDDING_SIZE = 10
+_LATENT_EMBEDDING_SIZE = 3
 _AMINO_ACID_EMBEDDING_DIMS = 20
 
 def ShapeList(x):
@@ -144,36 +144,29 @@ def _ApplySharedTransformer(base_features, atom_mask, num_blocks, num_transforme
       [original_shape[0], original_shape[1], original_shape[2], -1])
   return transformer_output
 
+def log_sigma2(gamma):
+  return tf.math.log_sigmoid(-1*gamma)
+
+def sigma2(gamma):
+  return tf.math.sigmoid(-1*gamma)
+
+def alpha(gamma):
+  return tf.math.sqrt(1-sigma2(gamma))
+
 def EncoderModel():
   # The inputs.
   normalized_coordinates = tf.keras.Input(
       shape=[None, None, 3],
       name='normalized_coordinates')
-  atom_mask = tf.keras.Input(
-      shape=[None, None],
-      name='atom_mask')
-  cond = tf.keras.Input(
-      shape=[None, None, _COND_EMBEDDING_SIZE],
-      name='cond')
 
-  # Compute Amino Acid Positional Embedding
-  pemb = AminoAcidPositionalEmbedding(cond)
-  peptide_indx = PeptideIndx(cond)
-
-  num_blocks = 200
-  base_features = tf.keras.layers.concatenate(
-      inputs=[normalized_coordinates, cond, peptide_indx])
-  transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 10)
-  transformer_output = tf.ensure_shape(
-      transformer_output, [None, None, None, 10])
-
-  # Have each atom vote on z. 
-  logvar = tf.Variable(1.0)
+  gamma = tf.Variable(6.0)
+  a = alpha(gamma)
+  logvar = log_sigma2(gamma)
   return tf.keras.Model(
-      inputs=[normalized_coordinates, atom_mask, cond],
+      inputs=[normalized_coordinates],
       outputs=tf.keras.layers.concatenate(inputs=
-          [transformer_output, logvar*tf.ones_like(transformer_output)], axis=1))
+          [a*normalized_coordinates,
+            logvar*tf.ones_like(normalized_coordinates)], axis=1))
 
 def DecoderModel():
   # The inputs.
@@ -193,9 +186,9 @@ def DecoderModel():
   base_features = tf.keras.layers.concatenate(
       inputs=[z, cond, peptide_indx])
   transformer_output = _ApplySharedTransformer(
-      base_features, atom_mask, num_blocks, 17)
+      base_features, atom_mask, num_blocks, 10)
   transformer_output = tf.ensure_shape(
-      transformer_output, [None, None, None, 17])
+      transformer_output, [None, None, None, 10])
   loc = tf.keras.layers.Dense(3)(transformer_output)
   scale_diag = tf.Variable(1.0)
   return tf.keras.Model(
