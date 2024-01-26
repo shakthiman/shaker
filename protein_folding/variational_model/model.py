@@ -20,6 +20,11 @@ def _XMask(x):
             tf.math.reduce_any(
                 tf.math.greater(tf.math.abs(x), 1e-6), axis=[-1]), tf.float32)
 
+def LoadModel(full_model_location, model_weight_location, suffix):
+  model = tf.keras.models.load_model(full_model_location + suffix)
+  model.load_weights(model_weight_location + suffix)
+  return model
+
 class Conditioner(object):
   def __init__(self, model):
     self._model = model
@@ -151,3 +156,9 @@ class VariationalModel(object):
     self._conditioner.save_weights(location + '/conditioner')
     self._decoder.save_weights(location + '/decoder')
     self._encoder.save_weights(location + '/encoder')
+
+  def load_model(full_model_location, model_weight_location):
+    return VariationalModel(
+        Conditioner(LoadModel(full_model_location, model_weight_location, '/conditioner')),
+        Decoder(LoadModel(full_model_location, model_weight_location, '/decoder')),
+        Encoder(LoadModel(full_model_location, model_weight_location, '/encoder')))
