@@ -81,7 +81,7 @@ class Encoder(object):
 
   # Reparametrizes mean and logvar to z.
   def reparameterize(self, mean, logvar):
-    eps = tf.random.normal(shape=mean.shape)
+    eps = tf.random.normal(shape=tf.shape(mean))
     return eps * tf.exp(logvar * 0.5) + mean
 
   def trainable_weights(self):
