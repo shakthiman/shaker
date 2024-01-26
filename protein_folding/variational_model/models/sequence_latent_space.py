@@ -153,13 +153,20 @@ def sigma2(gamma):
 def alpha(gamma):
   return tf.math.sqrt(1-sigma2(gamma))
 
-class ConstantValue(tf.keras.layers.Layer):
-  def __init__(self, name, initial_value):
-    super(ConstantValue, self).__init__()
-    self._constant_value = tf.Variable(initial_value, name=name)
+class FinalEncoderLayer(tf.keras.layers.Layer):
+  def __init__(self, initial_gamma_value):
+    super(FinalEncoderLayer, self).__init__()
+    self._initial_gamma_value = initial_gamma_value
 
-  def call(self, unused_input):
-    return self._constant_value
+  def build(self, input_shape):
+    self._gamma_variable = tf.Variable(self._initial_gamma_value, name='gamma')
+
+  def call(self, normalized_coordinates):
+    a = alpha(self._gamma_variable)
+    logvar = log_sigma2(self._gamma_variable)
+    return tf.keras.layers.concatenate(
+        inputs=[a*normalized_coordinates, logvar*tf.ones_like(normalized_coordinates)],
+        axis=1)
 
 def EncoderModel():
   # The inputs.
@@ -167,14 +174,21 @@ def EncoderModel():
       shape=[None, None, 3],
       name='normalized_coordinates')
 
-  gamma = ConstantValue('gamma', 6.0)(tf.constant(2.0))
-  a = alpha(gamma)
-  logvar = log_sigma2(gamma)
+  fel = FinalEncoderLayer(6.0)
   return tf.keras.Model(
       inputs=[normalized_coordinates],
-      outputs=tf.keras.layers.concatenate(inputs=
-          [a*normalized_coordinates,
-            logvar*tf.ones_like(normalized_coordinates)], axis=1))
+      outputs=fel(normalized_coordinates))
+
+class FinalDecoderLayer(tf.keras.layers.Layer):
+  def __init__(self, initial_scale_diag_value):
+    super(FinalDecoderLayer, self).__init__()
+    self._initial_scale_diag_value = initial_scale_diag_value
+
+  def build(self, input_shape):
+    self._scale_diag_variable = tf.Variable(self._initial_scale_diag_value, name='scale_diag')
+
+  def call(self, loc):
+    return [loc, self._scale_diag_variable*tf.ones_like(loc)]
 
 def DecoderModel():
   # The inputs.
@@ -198,10 +212,10 @@ def DecoderModel():
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 10])
   loc = tf.keras.layers.Dense(3)(transformer_output)
-  scale_diag = ConstantValue('gamma', 1.0)(tf.constant(1.0))
+  fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
-      outputs=[loc, scale_diag*tf.ones_like(loc)])
+      outputs=fdl(loc))
 
 def CondModel(residue_lookup_size, atom_lookup_size):
   residue_names = tf.keras.Input(shape=(None, None), name='residue_names')
