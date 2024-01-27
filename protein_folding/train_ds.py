@@ -14,7 +14,7 @@ def _IgnoreCondition(x):
             # Too many atoms
             tf.math.greater(tf.shape(peptide_shapes)[0]*tf.math.reduce_max(peptide_shapes), 40000)]))
 
-def _PrepareTFDataset(filenames, num_parallel_calls):
+def _PrepareTFDataset(filenames):
   return (
       tf.data.TFRecordDataset(filenames)
       .map(training_example.ParseProteinOnlyExample,
@@ -29,8 +29,10 @@ def _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
       .repeat()
       .shuffle(cluster_shuffle_size)
       .interleave(
-        lambda filenames: _PrepareTFDataset(tf.io.parse_tensor(filenames, tf.string), num_parallel_calls),
-        cycle_length=cluster_cycle_length))
+        lambda filenames: _PrepareTFDataset(tf.io.parse_tensor(filenames, tf.string)),
+        num_parallel_calls=num_parallel_calls,
+        cycle_length=cluster_cycle_length,
+        deterministic=False))
 
 def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls,
     cluster_shuffle_size, cluster_cycle_length):
@@ -47,7 +49,7 @@ def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls,
   return _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
       cluster_shuffle_size, cluster_cycle_length)
 
-def GetSmallTFExamples(project, bucket, blob_prefix, num_parallel_calls, size):
+def GetSmallTFExamples(project, bucket, blob_prefix, size):
   client = storage.Client(project)
   blobs = client.list_blobs(bucket, prefix=blob_prefix)
   files_by_cluster = dict()
@@ -61,6 +63,6 @@ def GetSmallTFExamples(project, bucket, blob_prefix, num_parallel_calls, size):
 
   raw_datasets = []
   for cluster, files in list(files_by_cluster.items())[:size]:
-    raw_datasets.append(_PrepareTFDataset(files, num_parallel_calls))
+    raw_datasets.append(_PrepareTFDataset(files))
 
   return tf.data.Dataset.sample_from_datasets(raw_datasets)
