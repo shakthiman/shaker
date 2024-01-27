@@ -17,8 +17,7 @@ def _IgnoreCondition(x):
 def _PrepareTFDataset(filenames):
   return (
       tf.data.TFRecordDataset(filenames)
-      .map(training_example.ParseProteinOnlyExample,
-          num_parallel_calls=num_parallel_calls)
+      .map(training_example.ParseProteinOnlyExample)
       .filter(lambda x: not _IgnoreCondition(x)))
 
 def _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
