@@ -30,8 +30,7 @@ def _CreateInterleavedDataset(files_by_cluster, num_parallel_calls,
       .interleave(
         lambda filenames: _PrepareTFDataset(tf.io.parse_tensor(filenames, tf.string)),
         num_parallel_calls=num_parallel_calls,
-        cycle_length=cluster_cycle_length,
-        deterministic=False))
+        cycle_length=cluster_cycle_length))
 
 def GetTFExamples(project, bucket, blob_prefix, num_parallel_calls,
     cluster_shuffle_size, cluster_cycle_length):
