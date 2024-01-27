@@ -20,7 +20,7 @@ _SINGLE_CHAIN_TAG = 'single_chain'
 def _GetPDBStructure(pdb_id):
   storage_client = storage.Client()
   blob = storage_client.bucket(_PDB_DOWNLOAD_BUCKET_NAME).blob('{}.cif'.format(pdb_id))
-  parser = PDB.FastMMCIFParser()
+  parser = PDB.MMCIFParser()
   return parser.get_structure(pdb_id, blob.open())
 
 def _GetStructurePartition(model, pcl, lch):
@@ -48,12 +48,17 @@ def _GetStructurePartition(model, pcl, lch):
 
   return all_partitions
 
-def _ReadToTrainingFeatures(pdb_id, pcl, lch):
+def _ReadToTrainingFeatures(pdb_id, pcl, lch, resolution_threshold):
   # Short circuit and do not read ligands.
   if lch.HasLigands(pdb_id):
     return []
   try:
     structure = _GetPDBStructure(pdb_id)
+    if (('resolution' in structure.header) and
+        (structure.header['resolution'] is not None) and
+        (structure.header['resolution']>resolution_threshold)):
+      # The structure is not reliable.
+      return []
   except Exception as e:
     logging.warning(
         'Constructing PDB Structure failed with: {}'.format(str(e)))
@@ -67,9 +72,11 @@ def _ReadToTrainingFeatures(pdb_id, pcl, lch):
         yield (p, e)
 
 class TrainingFeaturesDoFn(beam.DoFn):
-  def __init__(self, lig_pairs_blob, clusters_by_entity_blob):
+  def __init__(
+      self, lig_pairs_blob, clusters_by_entity_blob, resolution_threshold):
     self._lig_pairs_blob = lig_pairs_blob
     self._clusters_by_entity_blob = clusters_by_entity_blob
+    self._resolution_threshold = resolution_threshold
 
   def setup(self):
     storage_client = storage.Client()
@@ -81,7 +88,8 @@ class TrainingFeaturesDoFn(beam.DoFn):
         .blob(self._lig_pairs_blob).open())
 
   def process(self, pdb_id):
-    for e in _ReadToTrainingFeatures(pdb_id, self._pcl, self._lch):
+    for e in _ReadToTrainingFeatures(
+        pdb_id, self._pcl, self._lch, self._resolution_threshold):
       yield e
 
 class TFExampleSink(fileio.FileSink):
@@ -95,7 +103,8 @@ class TFExampleSink(fileio.FileSink):
   def flush(self):
     pass
   
-def DownloadTrainingExamples(pdb_ids, target_location, summary_location, runner, options):
+def DownloadTrainingExamples(pdb_ids, target_location, summary_location, runner, options,
+    resolution_threshold=9.0):
   storage_client = storage.Client()
   clusters_by_entity = 'clusters-by-entity-40.txt'
   pcl = protein_cluster_lookup.ProteinClusterLookup(
@@ -116,7 +125,9 @@ def DownloadTrainingExamples(pdb_ids, target_location, summary_location, runner,
   training_features= (
       p | 'Create initial values' >> beam.Create(pdb_ids)
         | 'Retrieve Examples' >> beam.ParDo(TrainingFeaturesDoFn(
-            'lig_pairs.lst', clusters_by_entity)))
+            lig_pairs_blob='lig_pairs.lst',
+            clusters_by_entity_blob=clusters_by_entity,
+            resolution_threshold=resolution_threshold)))
   # Compute the Summaries
   (training_features
     | 'Remove Partition' >> beam.Map(lambda x: x[1])

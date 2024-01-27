@@ -61,6 +61,7 @@ def ProteinOnlyFeatures(pdb_model):
   total_num_atoms = 0
 
   for c in pdb_model.get_chains():
+    atoms_in_chain = 0
     chain_ids.append(c.id)
     residue_seqid =0
     # Keyed by atom-idx
@@ -93,6 +94,9 @@ def ProteinOnlyFeatures(pdb_model):
         chain_atoms['atom_coords'].append(atom_coords)
         center_of_mass += atom_coords
         total_num_atoms += 1
+        atoms_in_chain += 1
+    if atoms_in_chain ==0:
+      return None
     atoms.append(chain_atoms)
 
   if total_num_atoms==0:
