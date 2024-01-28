@@ -37,7 +37,8 @@ def _TrainStep(model, optimizer, training_data, beta):
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
     tensorboard_target, beta_fn=lambda cpu_step: 1):
-  summary_writer = tf.summary.create_file_writer(tensorboard_target)
+  summary_writer = tf.summary.create_file_writer(
+          tensorboard_target, max_queue=10000, flush_millis=600000)
   tds = ds.shuffle(shuffle_size).map(
       lambda x: {
         'residue_names':pdb_vocab.GetResidueNamesId(x['resname']).to_tensor(),
