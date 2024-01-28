@@ -15,9 +15,9 @@ def _IgnoreCondition(x):
             # Too many atoms
             tf.math.greater(tf.shape(peptide_shapes)[0]*tf.math.reduce_max(peptide_shapes), 20000)]))
 
-def _PrepareTFDataset(filenames):
+def _PrepareTFDataset(filenames, files_to_take=1):
   return (
-      tf.data.TFRecordDataset(tf.random.shuffle(filenames))
+      tf.data.TFRecordDataset(tf.random.shuffle(filenames)[0:files_to_take])
       .map(training_example.ParseProteinOnlyExample)
       .filter(lambda x: not _IgnoreCondition(x)))
 
