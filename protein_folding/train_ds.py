@@ -12,7 +12,7 @@ def _IgnoreCondition(x):
             # Too many peptides.
             tf.math.greater(tf.shape(peptide_shapes)[0], 10),
             # Too many atoms
-            tf.math.greater(tf.shape(peptide_shapes)[0]*tf.math.reduce_max(peptide_shapes), 40000)]))
+            tf.math.greater(tf.shape(peptide_shapes)[0]*tf.math.reduce_max(peptide_shapes), 20000)]))
 
 def _PrepareTFDataset(filenames):
   return (
