@@ -17,7 +17,7 @@ def _IgnoreCondition(x):
 
 def _PrepareTFDataset(filenames):
   return (
-      tf.data.TFRecordDataset(random.choice(filenames))
+      tf.data.TFRecordDataset(tf.random.shuffle(filenames))
       .map(training_example.ParseProteinOnlyExample)
       .filter(lambda x: not _IgnoreCondition(x)))
 
