@@ -1,5 +1,6 @@
 from google.cloud import storage
 import tensorflow as tf
+import random
 
 from protein_folding import training_example
 
@@ -16,7 +17,7 @@ def _IgnoreCondition(x):
 
 def _PrepareTFDataset(filenames):
   return (
-      tf.data.TFRecordDataset(filenames)
+      tf.data.TFRecordDataset(random.choice(filenames))
       .map(training_example.ParseProteinOnlyExample)
       .filter(lambda x: not _IgnoreCondition(x)))
 
