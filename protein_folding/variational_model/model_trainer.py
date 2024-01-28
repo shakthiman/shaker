@@ -53,16 +53,17 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   for step, training_data in tds.enumerate():
     beta = beta_fn(cpu_step)
     train_step_information = _TrainStep(model, optimizer, training_data, tf.constant(beta))
-    with summary_writer.as_default():
-      tf.summary.scalar('loss', train_step_information.loss_information.loss, step=step)
-      tf.summary.scalar('loss_beta_1', train_step_information.loss_information.loss_beta_1, step=step)
-      tf.summary.scalar('logpx_z', train_step_information.loss_information.logpx_z, step=step)
-      tf.summary.scalar('logpz', train_step_information.loss_information.logpz, step=step)
-      tf.summary.scalar('logqz_x', train_step_information.loss_information.logqz_x, step=step)
-      tf.summary.scalar('diff_mae', train_step_information.loss_information.diff_mae, step=step)
-      tf.summary.scalar('grad_norm', train_step_information.grad_norm, step=step)
-      for s, g in train_step_information.grad_norm_by_source.items():
-        tf.summary.scalar('grad_norm_by_source_' + s, g, step=step)
+    if cpu_step % 100 ==0
+      with summary_writer.as_default():
+        tf.summary.scalar('loss', train_step_information.loss_information.loss, step=step)
+        tf.summary.scalar('loss_beta_1', train_step_information.loss_information.loss_beta_1, step=step)
+        tf.summary.scalar('logpx_z', train_step_information.loss_information.logpx_z, step=step)
+        tf.summary.scalar('logpz', train_step_information.loss_information.logpz, step=step)
+        tf.summary.scalar('logqz_x', train_step_information.loss_information.logqz_x, step=step)
+        tf.summary.scalar('diff_mae', train_step_information.loss_information.diff_mae, step=step)
+        tf.summary.scalar('grad_norm', train_step_information.grad_norm, step=step)
+        for s, g in train_step_information.grad_norm_by_source.items():
+          tf.summary.scalar('grad_norm_by_source_' + s, g, step=step)
     if cpu_step == 0:
         model.save('{}/version_{}'.format(write_target, cpu_step))
     elif cpu_step % save_frequency==0:
