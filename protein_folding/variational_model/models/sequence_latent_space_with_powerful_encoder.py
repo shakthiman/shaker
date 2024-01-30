@@ -193,7 +193,7 @@ def EncoderModel():
       transformer_output, [None, None, None, 10])
   fel = FinalEncoderLayer(6.0)
   return tf.keras.Model(
-      inputs=[normalized_coordinates],
+      inputs=[normalized_coordinates, atom_mask, cond],
       outputs=fel(transformer_output))
 
 class FinalDecoderLayer(tf.keras.layers.Layer):
