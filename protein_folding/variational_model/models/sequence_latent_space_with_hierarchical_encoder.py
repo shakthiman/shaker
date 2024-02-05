@@ -174,17 +174,10 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
 
   for i in range(num_layers-1, -1, -1):
     z = z_list[i]
-    if i == num_layers-1:
-      transformer_input = tf.keras.layers.concatenate(
+    transformer_input = tf.keras.layers.concatenate(
         [x, z])
-      transformer_input = tf.ensure_shape(transformer_input,
-            [None, None, channel_size + _LATENT_EMBEDDING_SIZE])
-    else:
-      deeper_z = z_list[i+1]
-      transformer_input = tf.keras.layers.concatenate(
-        [x, z, deeper_z])
-      transformer_input = tf.ensure_shape(transformer_input,
-            [None, None, channel_size + 2*_LATENT_EMBEDDING_SIZE])
+    transformer_input = tf.ensure_shape(transformer_input,
+        [None, None, channel_size + _LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
         num_blocks, num_heads, key_dim, transformer_input, inputs_mask)
     x = FeedForwardLayer(num_dnn_layers, channel_size,
