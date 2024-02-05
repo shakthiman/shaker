@@ -3,8 +3,9 @@ import tensorflow as tf
 from protein_folding.variational_model import model
 
 _COND_EMBEDDING_SIZE = 6
-_LATENT_EMBEDDING_SIZE = 10
+_LATENT_EMBEDDING_SIZE = 30
 _AMINO_ACID_EMBEDDING_DIMS = 20
+_NUM_TRANSFORMERS = 10
 
 def ShapeList(x):
   ps = x.get_shape().as_list()
@@ -119,7 +120,7 @@ def EncoderTransformerLayer(num_transformers, num_blocks, num_heads, key_dim,
     x_list.append(x)
   return x_list
 
-def HierarchicalNoise(encoder_transformer_outputs, output_size, num_dense_layres):
+def HierarchicalNoise(encoder_transformer_outputs, output_size, num_dense_layers):
   outputs = encoder_transformer_outputs
   for n in range(num_dense_layers):
     outputs = [
@@ -148,7 +149,7 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
     tf.constant([0, 0]),
     tf.stack([tf.constant(0), ideal_sequence_size-sequence_size])]))
   transformer_outputs = EncoderTransformerLayer(
-      num_transformers=10,
+      num_transformers=_NUM_TRANSFORMERS,
       num_blocks=num_blocks,
       num_heads=5,
       key_dim=10,
@@ -166,27 +167,32 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
   return transformer_outputs
 
 def DecoderTransformLayer(num_blocks, num_heads, key_dim,
-    num_dnn_layers, inputs, inputs_mask, z_list):
+    num_dnn_layers, inputs, inputs_mask, z_list, channel_size):
   x = inputs
   # One layer per set of latent variables.
   num_layers = len(z_list)
-  input_shape =ShapeList(x)
-  assert len(input_shape)==3
 
   for i in range(num_layers-1, -1, -1):
     z = z_list[i]
-    deeper_z = tf.zeros_like(z)
-    if i < num_layers-1:
+    if i == num_layers-1:
+      transformer_input = tf.keras.layers.concatenate(
+        [x, z])
+      transformer_input = tf.ensure_shape(transformer_input,
+            [None, None, channel_size + _LATENT_EMBEDDING_SIZE])
+    else:
       deeper_z = z_list[i+1]
-    transformer_input = tf.keras.layers.concatenate(
+      transformer_input = tf.keras.layers.concatenate(
         [x, z, deeper_z])
+      transformer_input = tf.ensure_shape(transformer_input,
+            [None, None, channel_size + 2*_LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
         num_blocks, num_heads, key_dim, transformer_input, inputs_mask)
-    x = FeedForwardLayer(num_dnn_layers, input_shape[-1], transformer_input)
+    x = FeedForwardLayer(num_dnn_layers, channel_size,
+        tf.keras.layers.Dense(channel_size)(transformer_input))
   return x
 
 def _DecoderTransformer(
-    base_features, z_list, atom_mask, num_blocks):
+    base_features, z_list, atom_mask, num_blocks, channel_size):
   # Straighten, Attend, and Reshape
   original_shape = ShapeList(base_features)
   assert len(original_shape) == 4
@@ -204,7 +210,7 @@ def _DecoderTransformer(
                        tf.constant([0, 0])])
   padded_features = tf.pad(straightened_features, paddings)
   padded_features = tf.ensure_shape(padded_features,
-      [None, None, original_shape[-1]])
+      [None, None, channel_size])
   padded_z_list = [tf.pad(z, paddings) for z in straightened_z_list]
   padded_mask = tf.pad(straightened_mask, tf.stack([
     tf.constant([0, 0]),
@@ -216,9 +222,11 @@ def _DecoderTransformer(
       num_dnn_layers=5,
       inputs=padded_features,
       inputs_mask=padded_mask,
-      z_list=padded_z_list)
+      z_list=padded_z_list,
+      channel_size=channel_size)
   transformer_outputs = transformer_outputs[:,:sequence_size,:]
-  transformer_outputs = tf.reshape(original_shape[0], original_shape[1], original_shape[2], -1)
+  transformer_outputs = tf.reshape(transformer_outputs,
+      [original_shape[0], original_shape[1], original_shape[2], -1])
   return transformer_outputs
 
 def log_sigma2(gamma):
@@ -270,7 +278,7 @@ def EncoderModel():
       tf.ensure_shape(t, [None, None, None, 30])
       for t in transformer_outputs]
   transformer_outputs = tf.keras.layers.concatenate(
-      [tf.expand_dims(t, 1) for t in transformer_outputs]
+      [tf.expand_dims(t, 1) for t in transformer_outputs],
       axis=1)
   fel = FinalEncoderLayer(6.0)
   return tf.keras.Model(
@@ -298,7 +306,7 @@ def DecoderModel():
       shape=[None, None, _COND_EMBEDDING_SIZE],
       name='cond')
 
-  z_list = tf.unstack(z, axis=1)
+  z_list = tf.unstack(z, _NUM_TRANSFORMERS, axis=1)
 
   # Compute Amino Acid Positional Embedding
   pemb = AminoAcidPositionalEmbedding(cond)
@@ -311,7 +319,8 @@ def DecoderModel():
       base_features=base_features,
       z_list=z_list,
       atom_mask=atom_mask,
-      num_blocks=num_blocks)
+      num_blocks=num_blocks,
+      channel_size=27)
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 27])
   loc = tf.keras.layers.Dense(3)(transformer_output)
