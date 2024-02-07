@@ -278,13 +278,24 @@ def EncoderModel():
       inputs=[normalized_coordinates, atom_mask, cond],
       outputs=fel(transformer_outputs))
 
+class ClipMinMax(tf.keras.constraints.Constraint):
+  def __init__(self, min_val, max_val):
+      self._min_val = min_val
+      self._max_val = max_val
+
+  def __call__(self, var):
+    return tf.clip_by_value(var, self._min_val, self._max_val)
+
 class FinalDecoderLayer(tf.keras.layers.Layer):
   def __init__(self, initial_scale_diag_value):
     super(FinalDecoderLayer, self).__init__()
     self._initial_scale_diag_value = initial_scale_diag_value
 
   def build(self, input_shape):
-    self._scale_diag_variable = tf.Variable(self._initial_scale_diag_value, name='scale_diag')
+    self._scale_diag_variable = tf.Variable(
+            self._initial_scale_diag_value,
+            name='scale_diag',
+            constraint=ClipMinMax(0.001, 10))
 
   def call(self, loc):
     return [loc, self._scale_diag_variable*tf.ones_like(loc)]
@@ -317,14 +328,10 @@ def DecoderModel():
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 27])
   loc = tf.keras.layers.Dense(3)(transformer_output)
-  variance = tf.keras.layers.Minimum()([
-      tf.keras.layers.Maximum()(
-        [tf.keras.layers.Dense(3)(transformer_output),
-          1e-3*tf.ones_like(loc)]),
-      10*tf.ones_like(loc)])
+  fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
-      outputs=[loc, variance])
+      outputs=fdl(loc))
 
 def CondModel(residue_lookup_size, atom_lookup_size):
   residue_names = tf.keras.Input(shape=(None, None), name='residue_names')
