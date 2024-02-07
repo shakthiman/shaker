@@ -317,10 +317,12 @@ def DecoderModel():
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 27])
   loc = tf.keras.layers.Dense(3)(transformer_output)
-  fdl = FinalDecoderLayer(1.0)
+  variance = tf.keras.layers.Maximum()(
+      [tf.keras.layers.Dense(3)(transformer_output),
+        1e-3*tf.ones_like(loc)])
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
-      outputs=fdl(loc))
+      outputs=[loc, variance])
 
 def CondModel(residue_lookup_size, atom_lookup_size):
   residue_names = tf.keras.Input(shape=(None, None), name='residue_names')
