@@ -42,7 +42,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   tds = ds.shuffle(shuffle_size).map(
       lambda x: {
         'residue_names':pdb_vocab.GetResidueNamesId(x['resname']).to_tensor(),
-        'atom_names':pdb_vocab.GetResidueNamesId(x['atom_name']).to_tensor(),
+        'atom_names':pdb_vocab.GetAtomNamesId(x['atom_name']).to_tensor(),
         'normalized_coordinates': x['atom_coords'].to_tensor()}).padded_batch(
             batch_size,
             padded_shapes={
