@@ -304,7 +304,7 @@ def DecoderModel():
   # The inputs.
   z = tf.keras.Input(shape=[None, None, None, _LATENT_EMBEDDING_SIZE], name='z')
   # Drop some of the latent layer to improve robustness.
-  z = tf.keras.layers.Dropout(0.2)(z)
+  dropout_z = tf.keras.layers.Dropout(0.2)(z)
   atom_mask = tf.keras.Input(
       shape=[None, None],
       name='atom_mask')
@@ -312,7 +312,7 @@ def DecoderModel():
       shape=[None, None, _COND_EMBEDDING_SIZE],
       name='cond')
 
-  z_list = tf.unstack(z, _NUM_TRANSFORMERS, axis=1)
+  z_list = tf.unstack(dropout_z, _NUM_TRANSFORMERS, axis=1)
 
   # Compute Amino Acid Positional Embedding
   pemb = AminoAcidPositionalEmbedding(cond)
