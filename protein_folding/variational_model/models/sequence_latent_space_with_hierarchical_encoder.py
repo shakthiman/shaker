@@ -303,6 +303,8 @@ class FinalDecoderLayer(tf.keras.layers.Layer):
 def DecoderModel():
   # The inputs.
   z = tf.keras.Input(shape=[None, None, None, _LATENT_EMBEDDING_SIZE], name='z')
+  # Drop some of the latent layer to improve robustness.
+  z = tf.keras.layers.Dropout(0.2)(z)
   atom_mask = tf.keras.Input(
       shape=[None, None],
       name='atom_mask')
