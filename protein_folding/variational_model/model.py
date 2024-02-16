@@ -118,6 +118,20 @@ class VariationalModel(object):
         self._decoder.trainable_weights() +
         self._encoder.trainable_weights())
 
+  def decode(self, encoder_embedding, training_data, training):
+    atom_mask = _XMask(training_data['normalized_coordinates'])
+    cond = self._conditioner.conditioning(
+        training_data['residue_names'], training_data['atom_names'], training)
+    return self._decoder.decode(encoder_embedding, atom_mask, cond, training)
+
+  def encode(self, training_data):
+    atom_mask = _XMask(training_data['normalized_coordinates'])
+    cond = self._conditioner.conditioning(
+        training_data['residue_names'], training_data['atom_names'], training)
+    mean, logvar = self._encoder.encode(
+        training_data['normalized_coordinates'], atom_mask, cond, training)
+    return self._encoder.reparameterize(mean, logvar)
+
   def compute_loss(self, training_data, training, beta=1.0):
     atom_mask = _XMask(training_data['normalized_coordinates'])
     cond = self._conditioner.conditioning(
