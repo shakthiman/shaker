@@ -124,7 +124,7 @@ class VariationalModel(object):
         training_data['residue_names'], training_data['atom_names'], training)
     return self._decoder.decode(encoder_embedding, atom_mask, cond, training)
 
-  def encode(self, training_data):
+  def encode(self, training_data, training):
     atom_mask = _XMask(training_data['normalized_coordinates'])
     cond = self._conditioner.conditioning(
         training_data['residue_names'], training_data['atom_names'], training)
