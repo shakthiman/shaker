@@ -180,8 +180,10 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
         [None, None, channel_size + _LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
         num_blocks, num_heads, key_dim, transformer_input, inputs_mask)
+    conv_inputs = tf.keras.layers.Conv1D(32, 100)(transformer_input)
     x = FeedForwardLayer(num_dnn_layers, channel_size,
-        tf.keras.layers.Dense(channel_size)(transformer_input))
+        tf.keras.layers.Dense(channel_size)(
+            tf.keras.layers.concatenate([transformer_input, conv_inputs])))
   return x
 
 def _DecoderTransformer(
