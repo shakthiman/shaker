@@ -83,6 +83,7 @@ class TransposeAndAttend(tf.keras.layers.Layer):
     self._query_projections = []
     self._key_projections = []
     self._value_projections = []
+    self._dot_product_scales = []
     for i in range(self._num_heads):
       self._query_projections.append(
           self.add_weight(
@@ -102,6 +103,8 @@ class TransposeAndAttend(tf.keras.layers.Layer):
             shape=[last_dim, self._value_dim],
             initializer="glorot_uniform",
             trainable=True))
+      self._dot_product_scales.append(
+          tf.Variable(1, name='dot_product_scale'))
     self._final_projection = self.add_weight(
         "final_projector",
         shape=[self._num_heads*self._value_dim, self._value_dim],
@@ -114,6 +117,7 @@ class TransposeAndAttend(tf.keras.layers.Layer):
       qp = self._query_projections[i]
       kp = self._key_projections[i]
       vp = self._value_projections[i]
+      ds = self._dot_product_scales[i]
 
       # Project (no transpose needed)
       qv = tf.linalg.matmul(input_tensor, qp)
@@ -121,7 +125,7 @@ class TransposeAndAttend(tf.keras.layers.Layer):
       vv = tf.linalg.matmul(input_tensor, vp)
 
       # Dot product (with transpose)
-      attention_values = tf.einsum(self._dotproduct_einsum_notation, qv, kv)
+      attention_values = tf.einsum(self._dotproduct_einsum_notation, qv, kv)*ds
       orig_attention_values_shape = ShapeList(attention_values)
       qv_shape = ShapeList(qv)
       attention_values_long = tf.reshape(attention_values, qv_shape[:-1] + [-1])
