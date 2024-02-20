@@ -104,7 +104,7 @@ class TransposeAndAttend(tf.keras.layers.Layer):
             initializer="glorot_uniform",
             trainable=True))
       self._dot_product_scales.append(
-          tf.Variable(1, name='dot_product_scale'))
+          tf.Variable(1.0, name='dot_product_scale'))
     self._final_projection = self.add_weight(
         "final_projector",
         shape=[self._num_heads*self._value_dim, self._value_dim],
