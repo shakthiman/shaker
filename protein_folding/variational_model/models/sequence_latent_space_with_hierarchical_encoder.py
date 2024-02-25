@@ -126,7 +126,7 @@ class TransposeAndAttend(tf.keras.layers.Layer):
     per_head_output = tf.einsum(
         self._kv_einsum_notation, attention_values, vv, input_mask, input_mask)
     return tf.einsum(
-        'bh...c,hco->b...o',
+        'bh...c,hco->b...o'
         per_head_output,
         self._final_projection)
 
