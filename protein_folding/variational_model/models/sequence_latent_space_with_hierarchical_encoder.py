@@ -69,14 +69,12 @@ def RefactorXMask(x_mask, n):
 class TransposeAndAttend(tf.keras.layers.Layer):
   def __init__(self, num_heads, key_dim, value_dim,
                dotproduct_einsum_notation,
-               attention_mask_einsum_notation,
                kv_einsum_notation):
     super(TransposeAndAttend, self).__init__()
     self._num_heads = num_heads
     self._key_dim = key_dim
     self._value_dim = value_dim
     self._dotproduct_einsum_notation = dotproduct_einsum_notation
-    self._attention_mask_einsum_notation = attention_mask_einsum_notation
     self._kv_einsum_notation = kv_einsum_notation
 
   def build(self, input_shape):
@@ -128,9 +126,11 @@ class TransposeAndAttend(tf.keras.layers.Layer):
 
       # Dot product (with transpose)
       attention_values = tf.einsum(self._dotproduct_einsum_notation, qv, kv)*ds
-      attention_mask = tf.einsum(self._attention_mask_einsum_notation, input_mask, input_mask)
-      attention_values = tf.keras.layers.Softmax()(
-              attention_values, tf.cast(attention_mask, tf.bool))
+      orig_attention_values_shape = ShapeList(attention_values)
+      qv_shape = ShapeList(qv)
+      attention_values_long = tf.reshape(attention_values, qv_shape[:-1] + [-1])
+      attention_values_long = tf.nn.softmax(attention_values_long)
+      attention_values = tf.reshape(attention_values_long, orig_attention_values_shape)
 
       intermediate_attentions.append(
           tf.einsum(self._kv_einsum_notation, attention_values, vv,
@@ -144,12 +144,10 @@ def AttentionLayer(num_blocks, num_heads, key_dim, value_dim, inputs, inputs_mas
   refactored_mask = RefactorXMask(inputs_mask, num_blocks)
   local_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
                                             'bglc,bgkc->bglk',
-                                            'bgl,bgk->bglk',
                                             'bglk,bgkc,bgl,bgk->bglc')(
                                                 refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
                                              'bglc,bklc->bglk',
-                                             'bgl,bgk->bglk',
                                              'bglk,bklc,bgl,bkl->bglc')(refactored_x, refactored_mask)
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([
