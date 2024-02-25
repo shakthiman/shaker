@@ -149,7 +149,7 @@ def AttentionLayer(num_blocks, num_heads, key_dim, value_dim, inputs, inputs_mas
                                                 refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
                                              'bglc,bklc->bglk',
-                                             'bgl,bkl->bglk',
+                                             'bgl,bgk->bglk',
                                              'bglk,bklc,bgl,bkl->bglc')(refactored_x, refactored_mask)
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([
