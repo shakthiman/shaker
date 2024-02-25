@@ -82,66 +82,75 @@ class TransposeAndAttend(tf.keras.layers.Layer):
   def build(self, input_shape):
     last_dim = input_shape[-1]
 
-    self._query_projector = self.add_weight(
-        "query_projector",
-        shape=[self._num_heads, last_dim, self._key_dim],
-        initializer="glorot_uniform",
-        trainable=True)
-    self._key_projector = self.add_weight(
-        "key_projector",
-        shape=[self._num_heads, last_dim, self._key_dim],
-        initializer="glorot_uniform",
-        trainable=True)
-    self._value_projector = self.add_weight(
-        "value_projector",
-        shape=[self._num_heads, last_dim, self._value_dim],
-        initializer="glorot_uniform",
-        trainable=True)
-    self._dot_product_scales = self.add_weight(
-        "dot_product_scales",
-        shape=[self._num_heads],
-        initializer="ones",
-        trainable=True)
+    self._query_projections = []
+    self._key_projections = []
+    self._value_projections = []
+    self._dot_product_scales = []
+    for i in range(self._num_heads):
+      self._query_projections.append(
+          self.add_weight(
+            "query_projector",
+            shape=[last_dim, self._key_dim],
+            initializer="glorot_uniform",
+            trainable=True))
+      self._key_projections.append(
+          self.add_weight(
+            "key_projector",
+            shape=[last_dim, self._key_dim],
+            initializer="glorot_uniform",
+            trainable=True))
+      self._value_projections.append(
+          self.add_weight(
+            "value_projector",
+            shape=[last_dim, self._value_dim],
+            initializer="glorot_uniform",
+            trainable=True))
+      self._dot_product_scales.append(
+          tf.Variable(1.0, name='dot_product_scale'))
     self._final_projection = self.add_weight(
         "final_projector",
-        shape=[self._num_heads, self._value_dim, self._value_dim],
+        shape=[self._num_heads*self._value_dim, self._value_dim],
         initializer="glorot_uniform",
         trainable=True)
 
   def call(self, input_tensor, input_mask):
-    qv = tf.einsum('b...c,hco->bh...o', input_tensor, self._query_projector)
-    kv = tf.einsum('b...c,hco->bh...o', input_tensor, self._key_projector)
-    vv = tf.einsum('b...c,hco->bh...o', input_tensor, self._value_projector)
+    intermediate_attentions = []
+    for i in range(self._num_heads):
+      qp = self._query_projections[i]
+      kp = self._key_projections[i]
+      vp = self._value_projections[i]
+      ds = self._dot_product_scales[i]
 
-    # Dot product (with transpose)
-    attention_values = tf.einsum(self._dotproduct_einsum_notation, qv, kv)
-    attention_values = tf.einsum('bh...,h->bh...', attention_values,
-                                 self._dot_product_scales)
-    attention_mask = tf.einsum(
-        self._attention_mask_einsum_notation, input_mask, input_mask)
-    attention_mask = tf.broadcast_to(tf.expand_dims(attention_mask, 1), ShapeList(attention_values))
-    attention_values = tf.keras.layers.Softmax()(
-        attention_values, tf.cast(attention_mask, tf.bool))
+      # Project (no transpose needed)
+      qv = tf.linalg.matmul(input_tensor, qp)
+      kv = tf.linalg.matmul(input_tensor, kp)
+      vv = tf.linalg.matmul(input_tensor, vp)
 
-    per_head_output = tf.einsum(
-        self._kv_einsum_notation, attention_values, vv, input_mask, input_mask)
-    return tf.einsum(
-        'bh...c,hco->b...o'
-        per_head_output,
+      # Dot product (with transpose)
+      attention_values = tf.einsum(self._dotproduct_einsum_notation, qv, kv)*ds
+      attention_mask = tf.einsum(self._attention_mask_einsum_notation, input_mask, input_mask)
+      attention_values = tf.keras.layers.Softmax()(
+              attention_values, tf.cast(attention_mask, tf.bool))
+
+      intermediate_attentions.append(
+          tf.einsum(self._kv_einsum_notation, attention_values, vv,
+            input_mask, input_mask))
+    return tf.linalg.matmul(
+        tf.keras.layers.concatenate(intermediate_attentions),
         self._final_projection)
 
 def AttentionLayer(num_blocks, num_heads, key_dim, value_dim, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, num_blocks)
   refactored_mask = RefactorXMask(inputs_mask, num_blocks)
   local_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
-                                            'bhglc,bhgkc->bhglk',
+                                            'bglc,bgkc->bglk',
                                             'bgl,bgk->bglk',
-                                            'bhglk,bhgkc,bgl,bgk->bhglc')(
+                                            'bglk,bgkc,bgl,bgk->bglc')(
                                                 refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
-                                             'bhglc,bhklc->bhglk',
+                                             'bglc,bklc->bglk',
                                              'bgl,bkl->bglk',
-                                             'bhglk,bhklc,bgl,bkl->bhglc')(refactored_x, refactored_mask)
+                                             'bglk,bklc,bgl,bkl->bglc')(refactored_x, refactored_mask)
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([
         inputs,
