@@ -78,7 +78,7 @@ class TransposeAndAttend(tf.keras.layers.Layer):
     self._kv_einsum_notation = kv_einsum_notation
 
   def build(self, input_shape):
-    last_dim = input_shape[-1]
+    last_dim = input_shape[0][-1]
 
     self._query_projections = []
     self._key_projections = []
@@ -129,15 +129,14 @@ class TransposeAndAttend(tf.keras.layers.Layer):
       attention_values = tf.reshape(attention_values_long, orig_attention_values_shape)
 
       intermediate_attentions.append(
-          tf.einsum(self._kv_einsum_notation, attention_values, vv,
-            input_mask, input_mask))
+          tf.einsum(kv_einsum_notation, attention_values, vv, input_mask, input_mask))
     return tf.linalg.matmul(
         tf.keras.layers.concatenate(intermediate_attentions),
         self._final_projection)
 
 def AttentionLayer(num_blocks, num_heads, key_dim, value_dim, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, num_blocks)
-  refactored_mask = RefactorXMask(inputs_mask, num_blocks)
+  refactored_mask = RefactorXMask(tf.cast(inputs_mask, tf.bool), num_blocks)
   local_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
                                             'bglc,bgkc->bglk',
                                             'bglk,bgkc,bgl,bgk->bglc')(
