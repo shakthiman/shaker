@@ -70,7 +70,6 @@ class TransposeAndAttend(tf.keras.layers.Layer):
   def __init__(self, num_heads, key_dim, value_dim,
                dotproduct_einsum_notation,
                kv_einsum_notation):
-    super(TransposeAndAttend, self).__init__()
     self._num_heads = num_heads
     self._key_dim = key_dim
     self._value_dim = value_dim
