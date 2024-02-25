@@ -66,83 +66,36 @@ def RefactorXMask(x_mask, n):
     x_mask_shape[1] // n # Number of timesteps reduced by a factor of n.
     ])
 
-class TransposeAndAttend(tf.keras.layers.Layer):
-  def __init__(self, num_heads, key_dim, value_dim,
-               dotproduct_einsum_notation,
-               kv_einsum_notation):
-    self._num_heads = num_heads
-    self._key_dim = key_dim
-    self._value_dim = value_dim
-    self._dotproduct_einsum_notation = dotproduct_einsum_notation
-    self._kv_einsum_notation = kv_einsum_notation
-
-  def build(self, input_shape):
-    last_dim = input_shape[0][-1]
-
-    self._query_projections = []
-    self._key_projections = []
-    self._value_projections = []
-    for i in range(self._num_heads):
-      self._query_projections.append(
-          self.add_weight(
-            "query_projector",
-            shape=[last_dim, self._key_dim],
-            initializer="glorot_uniform",
-            trainable=True))
-      self._key_projections.append(
-          self.add_weight(
-            "key_projector",
-            shape=[last_dim, self._key_dim],
-            initializer="glorot_uniform",
-            trainable=True))
-      self._value_projections.append(
-          self.add_weight(
-            "value_projector",
-            shape=[last_dim, self._value_dim],
-            initializer="glorot_uniform",
-            trainable=True))
-    self._final_projection = self.add_weight(
-        "final_projector",
-        shape=[self._num_heads*self._value_dim, self._value_dim],
-        initializer="glorot_uniform",
-        trainable=True)
+class CustomSelfAttention(tf.keras.layers.Layer):
+  def __init__(self, num_heads, key_dim):
+    super(CustomSelfAttention, self).__init__()
+    self._attention_layer = tf.keras.layers.MultiHeadAttention(num_heads, key_dim)
 
   def call(self, input_tensor, input_mask):
-    intermediate_attentions = []
-    for i in range(self._num_heads):
-      qp = self._query_projections[i]
-      kp = self._key_projections[i]
-      vp = self._value_projections[i]
+    def _apply_attention(x):
+      return self._attention_layer(x[0], x[0], x[0],
+          tf.math.logical_and(
+            tf.expand_dims(x[1], -1),
+            tf.expand_dims(x[1], -2))
+          )
+    return tf.map_fn(
+        _apply_attention, tf.tuple([input_tensor, input_mask]),
+        fn_output_signature=tf.float32)
 
-      # Project (no transpose needed)
-      qv = tf.linalg.matmul(input_tensor, qp)
-      kv = tf.linalg.matmul(input_tensor, kp)
-      vv = tf.linalg.matmul(input_tensor, vp)
+def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
+  transposed_x = tf.transpose(refactored_x, perm)
+  transposed_mask = tf.transpose(refactored_mask, perm[:-1])
+  score = attention_layer(transposed_x, transposed_mask)
+  return tf.transpose(score, perm)
 
-      # Dot product (with transpose)
-      attention_values = tf.einsum(self._dotproduct_einsum_notation, qv, kv)
-      orig_attention_values_shape = ShapeList(attention_values)
-      qv_shape = ShapeList(qv)
-      attention_values_long = tf.reshape(attention_values, qv_shape[:-1] + [-1])
-      attention_values_long = tf.nn.softmax(attention_values_long)
-      attention_values = tf.reshape(attention_values_long, orig_attention_values_shape)
-
-      intermediate_attentions.append(
-          tf.einsum(kv_einsum_notation, attention_values, vv, input_mask, input_mask))
-    return tf.linalg.matmul(
-        tf.keras.layers.concatenate(intermediate_attentions),
-        self._final_projection)
-
-def AttentionLayer(num_blocks, num_heads, key_dim, value_dim, inputs, inputs_mask):
+def AttentionLayer(num_blocks, num_heads, key_dim, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, num_blocks)
   refactored_mask = RefactorXMask(tf.cast(inputs_mask, tf.bool), num_blocks)
-  local_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
-                                            'bglc,bgkc->bglk',
-                                            'bglk,bgkc,bgl,bgk->bglc')(
-                                                refactored_x, refactored_mask)
-  global_self_attention = TransposeAndAttend(num_heads, key_dim, value_dim,
-                                             'bglc,bklc->bglk',
-                                             'bglk,bklc,bgl,bkl->bglc')(refactored_x, refactored_mask)
+  local_self_attention = CustomSelfAttention(num_heads, key_dim)(
+      refactored_x, refactored_mask)
+  global_self_attention = TransposeAndAttend(
+      CustomSelfAttention(num_heads, key_dim), refactored_x,
+      refactored_mask, [0, 2, 1, 3])
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([
         inputs,
@@ -162,7 +115,7 @@ def EncoderTransformerLayer(num_transformers, num_blocks, num_heads, key_dim,
   x = inputs
   x_list = []
   for i in range(num_transformers):
-    x = AttentionLayer(num_blocks, num_heads, key_dim, output_size, x, inputs_mask)
+    x = AttentionLayer(num_blocks, num_heads, key_dim, x, inputs_mask)
     x = FeedForwardLayer(num_dnn_layers, output_size, x)
     x_list.append(x)
   return x_list
@@ -226,9 +179,9 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
     transformer_input = tf.ensure_shape(transformer_input,
         [None, None, channel_size + _LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
-        num_blocks, num_heads, key_dim, channel_size + _LATENT_EMBEDDING_SIZE,
-        transformer_input, inputs_mask)
-    conv_inputs = tf.keras.layers.Conv1D(32, 100, padding='same')(transformer_input)
+        num_blocks, num_heads, key_dim, transformer_input, inputs_mask)
+    conv_inputs = tf.keras.layers.Conv1D(32, 100, padding='same')(
+        transformer_input)
     x = FeedForwardLayer(num_dnn_layers, channel_size,
         tf.keras.layers.Dense(channel_size)(
             tf.keras.layers.concatenate([transformer_input, conv_inputs])))
