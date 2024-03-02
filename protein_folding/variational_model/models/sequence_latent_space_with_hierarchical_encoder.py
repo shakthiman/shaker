@@ -355,8 +355,28 @@ def CondModel(residue_lookup_size, atom_lookup_size):
   cond_out = tf.keras.layers.Dense(_COND_EMBEDDING_SIZE)(cond_out)
   return tf.keras.Model(inputs=[residue_names, atom_names], outputs=cond_out)
 
+def RotationModel():
+  normalized_coordinates = tf.keras.Input(shape=[None, None, 3],
+                                          name='normalized_coordinates')
+  atom_mask = tf.keras.Input(shape=[None, None],
+                             name='atom_mask')
+  predicted_coordinates = tf.keras.Input(shape=[None, None, 3],
+                                         name='predicted_coordinates')
+  input_features = tf.keras.layers.concatenate(
+      [normalized_coordinates, predicted_coordinates])
+  straightened_features = StraightenMultipeptideSequence(input_features)
+  straightened_mask = StraightenMultipeptideMask(atom_mask)
+
+  prediction = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64))(
+      straightened_features, straightened_mask)
+  prediction = tf.keras.layers.Dense(64, activation='gelu')(prediction)
+  prediction = tf.keras.layers.Dense(3)(prediction)
+  return tf.keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
+                        outputs=prediction)
+
 MODEL_FOR_TRAINING = lambda vocab: model.VariationalModel(
     model.Conditioner(
       CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
     model.Decoder(DecoderModel()),
-    model.Encoder(EncoderModel()))
+    model.Encoder(EncoderModel()),
+    RotationModel())

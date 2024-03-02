@@ -5,6 +5,8 @@ import tensorflow_probability as tfp
 
 import numpy as np
 
+from tensorflow_graphics.geometry.transformation import rotation_matrix_3d
+
 tfd = tfp.distributions
 
 def _SaveModel(model, location):
@@ -101,10 +103,11 @@ class Encoder(object):
 LossInformation = collections.namedtuple(
     'LossInformation', ['loss', 'loss_beta_1', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae'])
 class VariationalModel(object):
-  def __init__(self, conditioner, decoder, encoder):
+  def __init__(self, conditioner, decoder, encoder, rotation_model=None):
     self._conditioner = conditioner
     self._decoder = decoder
     self._encoder = encoder
+    self._rotation_model = rotation_model
 
   def _log_normal_pdf(self, sample, mean, logvar):
     log2pi = tf.math.log(2. * np.pi)
@@ -116,7 +119,8 @@ class VariationalModel(object):
     return (
         self._conditioner.trainable_weights() +
         self._decoder.trainable_weights() +
-        self._encoder.trainable_weights())
+        self._encoder.trainable_weights() +
+        (self._rotation_model.trainable_weights if self._rotation_model is not None else []))
 
   def decode(self, encoder_embedding, training_data, training):
     atom_mask = _XMask(training_data['normalized_coordinates'])
@@ -132,6 +136,17 @@ class VariationalModel(object):
         training_data['normalized_coordinates'], atom_mask, cond, training)
     return self._encoder.reparameterize(mean, logvar)
 
+  def _get_rotation_matrix(self, normalized_coordinates,
+                           predicted_coordinates):
+    atom_mask = _XMask(training_data['normalized_coordinates'])
+    euler_rotation = self._rotation_model({
+      'normalized_coordinates': normalized_coordinates,
+      'atom_mask':atom_mask,
+      'predicted_coordinates':predicted_coordinates
+      })
+    euler_rotation = tf.ensure_shape(euler_rotation, [None, 3])
+    return rotation_matrix_3d.from_euler(euler_rotation)
+
   def compute_loss(self, training_data, training, beta=1.0):
     atom_mask = _XMask(training_data['normalized_coordinates'])
     cond = self._conditioner.conditioning(
@@ -142,6 +157,13 @@ class VariationalModel(object):
     x = self._decoder.decode(z, atom_mask, cond, training)
     # See https://www.tensorflow.org/tutorials/generative/cvae#define_the_loss_function_and_the_optimizer
     # for definition of the loss functions.
+    normalized_coordinates = training_data['normalized_coordinates']
+    if self._rotation_model is not None:
+      rot_matrix = self._get_rotation_matrix(
+          training_data['normalized_coordinates'], x.mean())
+      normalized_coordinates = rotation_matrix_3d.rotate(
+          normalized_coordinates,
+          tf.expand_dims(tf.expand_dims(rot_matrix, 1), 1))
     logpx_z = tf.reduce_sum(
             tf.math.multiply(
                 x.log_prob(training_data['normalized_coordinates']),
@@ -165,14 +187,20 @@ class VariationalModel(object):
     self._conditioner.save(location + '/conditioner')
     self._decoder.save(location + '/decoder')
     self._encoder.save(location + '/encoder')
+    if self._rotation_model:
+      _SaveModel(self._rotation_model, location + '/rotation_model')
   
   def save_weights(self, location):
     self._conditioner.save_weights(location + '/conditioner')
     self._decoder.save_weights(location + '/decoder')
     self._encoder.save_weights(location + '/encoder')
+    if self._rotation_model:
+      _SaveWeights(self._rotation_model, location + '/rotation_model')
 
-  def load_model(full_model_location, model_weight_location):
+  def load_model(full_model_location, model_weight_location, should_load_rotation_model=False):
     return VariationalModel(
         Conditioner(LoadModel(full_model_location, model_weight_location, '/conditioner')),
         Decoder(LoadModel(full_model_location, model_weight_location, '/decoder')),
-        Encoder(LoadModel(full_model_location, model_weight_location, '/encoder')))
+        Encoder(LoadModel(full_model_location, model_weight_location, '/encoder')),
+        LoadModel(full_model_location, model_weight_location, '/rotation_model')
+        if should_load_rotation_model else None)
