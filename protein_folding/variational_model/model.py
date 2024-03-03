@@ -161,16 +161,14 @@ class VariationalModel(object):
     if self._rotation_model is not None:
       rot_matrix = self._get_rotation_matrix(
           normalized_coordinates, x.mean())
-      normalized_coordinates_shape = tf.shape(normalized_coordinates)
-      normalized_coordinates = rotation_matrix_3d.rotate(
-          normalized_coordinates,
-          tf.broadcast_to(
-            tf.expand_dims(
-              tf.expand_dims(rot_matrix, 1), 1),
-            [normalized_coordinates_shape[0],
-             normalized_coordinates_shape[1],
-             normalized_coordinates_shape[2],
-             3,3]))
+      normalized_coordinates = tf.vectorized_map(
+          lambda sac, r:
+            tf.vectorized_map(
+              lambda ac: tf.vectorized_map(
+                lambda c: rotation_matrix_3d.rotate(c, r),
+                ac)
+              sac)
+          (normalized_coordinates, rot_matrix))
     logpx_z = tf.reduce_sum(
             tf.math.multiply(
                 x.log_prob(normalized_coordinates),
