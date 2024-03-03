@@ -162,12 +162,12 @@ class VariationalModel(object):
       rot_matrix = self._get_rotation_matrix(
           normalized_coordinates, x.mean())
       normalized_coordinates = tf.vectorized_map(
-          lambda sac, r:
+          lambda sacr:
             tf.vectorized_map(
               lambda ac: tf.vectorized_map(
-                lambda c: rotation_matrix_3d.rotate(c, r),
-                ac)
-              sac)
+                lambda c: rotation_matrix_3d.rotate(c, sacr[1]),
+                ac),
+              sacr[0]),
           (normalized_coordinates, rot_matrix))
     logpx_z = tf.reduce_sum(
             tf.math.multiply(
