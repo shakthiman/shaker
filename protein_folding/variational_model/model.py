@@ -138,7 +138,7 @@ class VariationalModel(object):
 
   def _get_rotation_matrix(self, normalized_coordinates,
                            predicted_coordinates):
-    atom_mask = _XMask(training_data['normalized_coordinates'])
+    atom_mask = _XMask(normalized_coordinates)
     euler_rotation = self._rotation_model({
       'normalized_coordinates': normalized_coordinates,
       'atom_mask':atom_mask,
@@ -160,19 +160,26 @@ class VariationalModel(object):
     normalized_coordinates = training_data['normalized_coordinates']
     if self._rotation_model is not None:
       rot_matrix = self._get_rotation_matrix(
-          training_data['normalized_coordinates'], x.mean())
+          normalized_coordinates, x.mean())
+      normalized_coordinates_shape = tf.shape(normalized_coordinates)
       normalized_coordinates = rotation_matrix_3d.rotate(
           normalized_coordinates,
-          tf.expand_dims(tf.expand_dims(rot_matrix, 1), 1))
+          tf.broadcast_to(
+            tf.expand_dims(
+              tf.expand_dims(rot_matrix, 1), 1),
+            [normalized_coordinates_shape[0],
+             normalized_coordinates_shape[1],
+             normalized_coordinates_shape[2],
+             3,3]))
     logpx_z = tf.reduce_sum(
             tf.math.multiply(
-                x.log_prob(training_data['normalized_coordinates']),
+                x.log_prob(normalized_coordinates),
                 atom_mask), axis=[-1, -2])
     logpz = self._log_normal_pdf(z, 0., 0.)
     logqz_x = self._log_normal_pdf(z, mean, logvar)
     diff_mae = tf.math.reduce_sum(
             tf.math.multiply(
-                tf.math.abs(training_data['normalized_coordinates'] - x.mean()),
+                tf.math.abs(normalized_coordinates - x.mean()),
                 tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
 
     return LossInformation(
