@@ -164,7 +164,7 @@ class VariationalModel(object):
       normalized_coordinates = tf.vectorized_map(
           lambda sacr:
             tf.vectorized_map(
-              lambda ac: tf.vectorized_map(
+              lambda ac: tf.map_fn(
                 lambda c: rotation_matrix_3d.rotate(c, sacr[1]),
                 ac),
               sacr[0]),
