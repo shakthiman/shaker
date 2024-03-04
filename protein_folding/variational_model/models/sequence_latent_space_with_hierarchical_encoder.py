@@ -358,21 +358,28 @@ def CondModel(residue_lookup_size, atom_lookup_size):
 def RotationModel():
   normalized_coordinates = tf.keras.Input(shape=[None, None, 3],
                                           name='normalized_coordinates')
-  atom_mask_input = tf.keras.Input(shape=[None, None],
+  atom_mask = tf.keras.Input(shape=[None, None],
                              name='atom_mask')
-  atom_mask = tf.cast(atom_mask_input, tf.bool)
   predicted_coordinates = tf.keras.Input(shape=[None, None, 3],
                                          name='predicted_coordinates')
+
   input_features = tf.keras.layers.concatenate(
       [normalized_coordinates, predicted_coordinates])
   straightened_features = StraightenMultipeptideSequence(input_features)
   straightened_mask = StraightenMultipeptideMask(atom_mask)
+  straightened_features = (straightened_features *
+                           tf.expand_dims(straightened_mask, -1))
+  straightened_features = tf.keras.layers.Conv1D(filters=64,
+                                                 kernel_size=100)(
+                                                     straightened_features)
+  straightened_features = tf.keras.layers.AveragePooling1D(100)(
+      straightened_features)
 
   prediction = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64))(
-      inputs=straightened_features, mask=straightened_mask)
+      inputs=straightened_features)
   prediction = tf.keras.layers.Dense(64, activation='gelu')(prediction)
   prediction = tf.keras.layers.Dense(3)(prediction)
-  return tf.keras.Model(inputs=[normalized_coordinates, atom_mask_input, predicted_coordinates],
+  return tf.keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
                         outputs=prediction)
 
 MODEL_FOR_TRAINING = lambda vocab: model.VariationalModel(
