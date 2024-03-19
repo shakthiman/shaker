@@ -303,6 +303,18 @@ class FinalDecoderLayer(tf.keras.layers.Layer):
   def call(self, loc):
     return [loc, self._scale_diag_variable*tf.ones_like(loc)]
 
+class DecoderLSTM(tf.keras.layers.Layer):
+  def __init__(self, units):
+    super(DecoderLSTM, self).__init__()
+    self._lstm_layer = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(units, return_sequences=True))
+  
+  def call(self, input_tensor, input_mask):
+    return tf.map_fn(
+        lambda x: self._lstm_layer(inputs=x[0], mask=x[1]),
+        tf.tuple([input_tensor, input_mask]),
+        fn_output_signature=tf.float32)
+
+
 def DecoderModel():
   # The inputs.
   z = tf.keras.Input(shape=[None, None, None, _LATENT_EMBEDDING_SIZE], name='z')
@@ -332,11 +344,8 @@ def DecoderModel():
       channel_size=27)
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 27])
-  convolve_layer = tf.keras.layers.Conv1D(32, 100, paddings='same')
-  convolved_output = tf.map_fn(
-      lambda x: tf.convolve_layer(x),
-      transformer_output)
-  loc = tf.keras.layers.Dense(3)(convolved_output)
+  lstm_output = DecoderLSTM(64)(transformer_output, tf.cast(atom_mask, tf.bool))
+  loc = tf.keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
