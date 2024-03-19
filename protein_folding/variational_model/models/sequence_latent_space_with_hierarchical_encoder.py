@@ -332,7 +332,11 @@ def DecoderModel():
       channel_size=27)
   transformer_output = tf.ensure_shape(
       transformer_output, [None, None, None, 27])
-  loc = tf.keras.layers.Dense(3)(transformer_output)
+  convolve_layer = tf.keras.layers.Conv1D(32, 100, paddings='same')
+  convolved_output = tf.map_fn(
+      lambda x: tf.convolve_layer(x),
+      transformer_output)
+  loc = tf.keras.layers.Dense(3)(convolved_output)
   fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
