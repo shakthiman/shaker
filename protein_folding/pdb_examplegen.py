@@ -21,7 +21,7 @@ def _GetPDBStructure(pdb_id):
   storage_client = storage.Client()
   blob = storage_client.bucket(_PDB_DOWNLOAD_BUCKET_NAME).blob('{}.cif'.format(pdb_id))
   parser = PDB.MMCIFParser()
-  return parser.get_structure(pdb_id, blob.open())
+  return (parser.get_structure(pdb_id, blob.open()), PDB.MMCIF2Dict.MMCIF2Dict(blob.open()))
 
 def _GetStructurePartition(model, pcl, lch):
   # Collect information required to know the protein's partition.
@@ -53,7 +53,10 @@ def _ReadToTrainingFeatures(pdb_id, pcl, lch, resolution_threshold):
   if lch.HasLigands(pdb_id):
     return []
   try:
-    structure = _GetPDBStructure(pdb_id)
+    structure, mmcif_dict = _GetPDBStructure(pdb_id)
+    assemblies = [
+        set(id_list.split(','))
+        for id_list in mmcif_dict['_pdbx_struct_assembly_gen.asym_id_list']]
     if (('resolution' in structure.header) and
         (structure.header['resolution'] is not None) and
         (structure.header['resolution']>resolution_threshold)):
@@ -66,10 +69,11 @@ def _ReadToTrainingFeatures(pdb_id, pcl, lch, resolution_threshold):
 
   for m in structure.get_models():
     partitions = _GetStructurePartition(m,pcl, lch)
-    for p in partitions:
-      e = training_example.ProteinOnlyFeatures(m)
-      if e is not None:
-        yield (p, e)
+    for assembly_chains in assemblies:
+      e = training_example.ProteinOnlyFeatures(m, assembly_chains)
+      for p in partitions:
+        if e is not None:
+          yield (p, e)
 
 class TrainingFeaturesDoFn(beam.DoFn):
   def __init__(

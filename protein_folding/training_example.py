@@ -50,7 +50,7 @@ def PreProcessPDBStructure(pdb_structure):
 #  - Residue Names [Key by (Chain-idx, atom-idx)]
 #  - Atom Names [Key by (Chain-idx, atom-idx)]
 #  - Atom Coordinates [Key by (Chain-idx, atom-idx, 3-dimension)]
-def ProteinOnlyFeatures(pdb_model):
+def ProteinOnlyFeatures(pdb_model, assembly_chains):
   # Keyed by Chain-Idx
   chain_ids = []
   # Keyed by (Chain-idx, atom-idx)
@@ -61,6 +61,8 @@ def ProteinOnlyFeatures(pdb_model):
   total_num_atoms = 0
 
   for c in pdb_model.get_chains():
+    if not c.id in assembly_chains:
+      continue
     atoms_in_chain = 0
     chain_ids.append(c.id)
     residue_seqid =0
