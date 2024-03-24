@@ -23,8 +23,8 @@ def main():
 
     pdb_examplegen.DownloadTrainingExamples(
         pids,
-        "gs://unreplicated-training-data/pdb_training_examples_jan_27",
-        "gs://unreplicated-training-data/pdb_training_examples_summary/data_jan_27", runners.DataflowRunner(), options)
+        "gs://unreplicated-training-data/pdb_training_examples_mar_23",
+        "gs://unreplicated-training-data/pdb_training_examples_summary/data_mar_23", runners.DataflowRunner(), options)
 
 if __name__=="__main__":
     main()
