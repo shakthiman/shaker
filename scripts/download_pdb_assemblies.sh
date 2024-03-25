@@ -25,7 +25,7 @@ MMCIF_DIR="${ROOT_DIR}/mmcif_files"
 echo "Fetching files from rsync.rcsb.org"
 mkdir --parents "${RAW_DIR}"
 rsync --recursive --links --perms --times --compress --info=progress2 --delete --port=33444 \
-  rsync.rcsb.org::ftp_data/assemblies/divided/mmCIF/ \
+  rsync.rcsb.org::ftp_data/assemblies/mmCIF/divided/ \
   "${RAW_DIR}"
 
 echo "Unzip all mmCIF files..."
