@@ -9,7 +9,7 @@ def main():
     client = storage.Client()
     pid_assemblies = dict()
     for b in client.bucket("rcsb_assemblies_download").list_blobs():
-      pid_assemblies.setdefault(b.split("-")[0]], []).append(b.name)
+      pid_assemblies.setdefault(b.name.split("-")[0], []).append(b.name)
     options = pipeline_options.PipelineOptions()
     _, options.view_as(pipeline_options.GoogleCloudOptions).project = google.auth.default()
     options.view_as(pipeline_options.GoogleCloudOptions).region = 'us-central1'
