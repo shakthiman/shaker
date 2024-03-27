@@ -7,8 +7,9 @@ from apache_beam.options import pipeline_options
 
 def main():
     client = storage.Client()
-    pids = [b.name.removesuffix('.cif') for b in client.bucket("rcsb_download").list_blobs()]
-    print(pids)
+    pid_assemblies = dict()
+    for b in client.bucket("rcsb_assemblies_download").list_blobs():
+      pid_assemblies.setdefault(b.split("-")[0]], []).append(b.name)
     options = pipeline_options.PipelineOptions()
     _, options.view_as(pipeline_options.GoogleCloudOptions).project = google.auth.default()
     options.view_as(pipeline_options.GoogleCloudOptions).region = 'us-central1'
@@ -22,9 +23,9 @@ def main():
     options.view_as(pipeline_options.WorkerOptions).machine_type="e2-highmem-4"
 
     pdb_examplegen.DownloadTrainingExamples(
-        pids,
-        "gs://unreplicated-training-data/pdb_training_examples_mar_23",
-        "gs://unreplicated-training-data/pdb_training_examples_summary/data_mar_23", runners.DataflowRunner(), options)
+        pid_assemblies,
+        "gs://unreplicated-training-data/pdb_training_examples_mar_26",
+        "gs://unreplicated-training-data/pdb_training_examples_summary/data_mar_26", runners.DataflowRunner(), options)
 
 if __name__=="__main__":
     main()
