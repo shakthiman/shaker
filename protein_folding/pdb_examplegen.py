@@ -82,7 +82,7 @@ def _ReadToTrainingFeatures(pdb_id, assembly_blob_names, pcl, lch, resolution_th
   for ass in assembly_structures:
     for m in ass.get_models():
       partitions = _GetStructurePartition(m, pdb_id, pcl, lch)
-      e = training_example.ProteinOnlyFeatures(m, assembly_chains)
+      e = training_example.ProteinOnlyFeatures(m)
       for p in partitions:
         if e is not None:
           yield (p, e)
