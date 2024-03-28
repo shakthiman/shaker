@@ -161,7 +161,7 @@ def DownloadTrainingExamples(pid_assemblies, target_location, summary_location, 
   training_features= (
       p | 'Create initial values' >> beam.Create(pid_assemblies)
         | 'Filter to Relevant Assemblies' >> beam.ParDo(RelevantAssembliesDoFn(
-          lig_pairs_blob='lig_pairs.lst'
+          lig_pairs_blob='lig_pairs.lst',
           resolution_threshold=resolution_threshold))
         | 'Retrieve Examples' >> beam.ParDo(TrainingFeaturesDoFn(
             lig_pairs_blob='lig_pairs.lst',
