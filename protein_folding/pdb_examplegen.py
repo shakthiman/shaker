@@ -163,6 +163,7 @@ def DownloadTrainingExamples(pid_assemblies, target_location, summary_location, 
         | 'Filter to Relevant Assemblies' >> beam.ParDo(RelevantAssembliesDoFn(
           lig_pairs_blob='lig_pairs.lst',
           resolution_threshold=resolution_threshold))
+        | 'Rebalance Data' >> beam.Reshuffle(num_buckets=1000)
         | 'Retrieve Examples' >> beam.ParDo(TrainingFeaturesDoFn(
             lig_pairs_blob='lig_pairs.lst',
             clusters_by_entity_blob=clusters_by_entity)))
