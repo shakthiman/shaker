@@ -113,8 +113,8 @@ class TrainingFeaturesDoFn(beam.DoFn):
         .blob(self._lig_pairs_blob).open())
 
   def process(self, pid_assembly_blob_name):
-    pdb_id = pid_assemblies_entry[0]
-    assembly_blob_name = pid_assemblies_entry[1]
+    pdb_id = pid_assembly_blob_name[0]
+    assembly_blob_name = pid_assembly_blob_name[1]
     for e in _ReadToTrainingFeatures(
         pdb_id, assembly_blob_name, self._pcl, self._lch):
       yield e
