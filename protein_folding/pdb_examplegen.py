@@ -18,25 +18,24 @@ _NO_CLUSTER_TAG = 'no_cluster'
 _POLYPEPTIDE_TAG = 'polypeptides'
 _SINGLE_CHAIN_TAG = 'single_chain'
 
-def _GetPDBStructure(pdb_id, assembly_blob_names):
+def _GetPDBStructure(pdb_id):
   storage_client = storage.Client()
   structure_blob = storage_client.bucket(_PDB_DOWNLOAD_BUCKET_NAME).blob(
       '{}.cif'.format(pdb_id))
   parser = PDB.MMCIFParser()
+
+  if structure_blob.exists():
+    return parser.get_structure(pdb_id, structure_blob.open())
+
+  return None
+
+def _GetAssemblyStructure(assembly_blob_name):
+  storage_client = storage.Client()
+  assembly_blob = storage_client.bucket(_ASSEMBLIES_DOWNLOAD_BUCKET_NAME).blob(assembly_blob_name)
   fast_parser = PDB.FastMMCIFParser()
-
-  assembly_structures = []
-  for b in assembly_blob_names:
-    assembly_blob = storage_client.bucket(
-        _ASSEMBLIES_DOWNLOAD_BUCKET_NAME).blob(b)
-    assembly_structures.append(fast_parser.get_structure(
-      b.removesuffix(".cif"),
-      assembly_blob.open()))
-
-  return (parser.get_structure(pdb_id, structure_blob.open())
-          if structure_blob.exists()
-          else None,
-          assembly_structures)
+  return fast_parser.get_structure(
+      assembly_blob_name.removesuffix(".cif"),
+      assembly_blob.open())
 
 def _GetStructurePartition(model, pdb_id, pcl, lch):
   # Collect information required to know the protein's partition.
@@ -62,12 +61,12 @@ def _GetStructurePartition(model, pdb_id, pcl, lch):
 
   return all_partitions
 
-def _ReadToTrainingFeatures(pdb_id, assembly_blob_names, pcl, lch, resolution_threshold):
+def _YieldRelevantAssemblyBlobNames(pdb_id, assembly_blob_names, lch, resolution_threshold):
   # Short circuit and do not read ligands.
   if lch.HasLigands(pdb_id):
     return []
   try:
-    structure, assembly_structures = _GetPDBStructure(pdb_id, assembly_blob_names)
+    structure = _GetPDBStructure(pdb_id)
     if (structure is not None and
         ('resolution' in structure.header) and
         (structure.header['resolution'] is not None) and
@@ -79,20 +78,30 @@ def _ReadToTrainingFeatures(pdb_id, assembly_blob_names, pcl, lch, resolution_th
         'Constructing PDB Structure failed with: {}'.format(str(e)))
     return []
 
-  for ass in assembly_structures:
-    for m in ass.get_models():
-      partitions = _GetStructurePartition(m, pdb_id, pcl, lch)
-      e = training_example.ProteinOnlyFeatures(m)
-      for p in partitions:
-        if e is not None:
-          yield (p, e)
+  for assn in assembly_blob_names:
+    yield (pdb_id, assn)
+
+
+def _ReadToTrainingFeatures(pdb_id, assembly_blob_name, pcl, lch):
+  try:
+    assembly_structure = _GetAssemblyStructure(assembly_blob_name)
+  except Exception as e:
+    logging.warning(
+        'Constructing PDB Assembly failed with: {}'.format(str(e)))
+    return []
+
+  for m in assembly_structure.get_models():
+    partitions = _GetStructurePartition(m, pdb_id, pcl, lch)
+    e = training_example.ProteinOnlyFeatures(m)
+    for p in partitions:
+      if e is not None:
+        yield (p, e)
 
 class TrainingFeaturesDoFn(beam.DoFn):
   def __init__(
-      self, lig_pairs_blob, clusters_by_entity_blob, resolution_threshold):
+      self, lig_pairs_blob, clusters_by_entity_blob):
     self._lig_pairs_blob = lig_pairs_blob
     self._clusters_by_entity_blob = clusters_by_entity_blob
-    self._resolution_threshold = resolution_threshold
 
   def setup(self):
     storage_client = storage.Client()
@@ -103,12 +112,31 @@ class TrainingFeaturesDoFn(beam.DoFn):
         storage_client.bucket(_SHAKER_DOWNLOADS)
         .blob(self._lig_pairs_blob).open())
 
-  def process(self, pid_assemblies_entry):
+  def process(self, pid_assembly_blob_name):
     pdb_id = pid_assemblies_entry[0]
-    assembly_blob_names = pid_assemblies_entry[1]
+    assembly_blob_name = pid_assemblies_entry[1]
     for e in _ReadToTrainingFeatures(
-        pdb_id, assembly_blob_names, self._pcl, self._lch, self._resolution_threshold):
+        pdb_id, assembly_blob_name, self._pcl, self._lch):
       yield e
+
+class RelevantAssembliesDoFn(beam.DoFn):
+  def __init__(
+      self, lig_pairs_blob, resolution_threshold):
+    self._lig_pairs_blob = lig_pairs_blob
+    self._resolution_threshold = resolution_threshold
+
+  def setup(self):
+    storage_client = storage.Client()
+    self._lch = ligand_check.LigandCheck(
+        storage_client.bucket(_SHAKER_DOWNLOADS)
+        .blob(self._lig_pairs_blob).open())
+  
+  def process(self, pid_assembly_blob_names):
+    pdb_id = pid_assembly_blob_names[0]
+    assembly_blob_names = pid_assembly_blob_names[1]
+    for pdb_id_assn in _YieldRelevantAssemblyBlobNames(
+        pdb_id, assembly_blob_names, self._lch, self._resolution_threshold):
+      yield pdb_id_assn
 
 class TFExampleSink(fileio.FileSink):
 
@@ -132,10 +160,12 @@ def DownloadTrainingExamples(pid_assemblies, target_location, summary_location, 
   p = beam.Pipeline()
   training_features= (
       p | 'Create initial values' >> beam.Create(pid_assemblies)
+        | 'Filter to Relevant Assemblies' >> beam.ParDo(RelevantAssembliesDoFn(
+          lig_pairs_blob='lig_pairs.lst'
+          resolution_threshold=resolution_threshold))
         | 'Retrieve Examples' >> beam.ParDo(TrainingFeaturesDoFn(
             lig_pairs_blob='lig_pairs.lst',
-            clusters_by_entity_blob=clusters_by_entity,
-            resolution_threshold=resolution_threshold)))
+            clusters_by_entity_blob=clusters_by_entity)))
   # Compute the Summaries
   (training_features
     | 'Remove Partition' >> beam.Map(lambda x: x[1])
