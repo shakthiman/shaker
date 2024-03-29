@@ -31,7 +31,11 @@ def _GetPDBStructure(pdb_id):
 
 def _GetAssemblyStructure(assembly_blob_name):
   storage_client = storage.Client()
-  assembly_blob = storage_client.bucket(_ASSEMBLIES_DOWNLOAD_BUCKET_NAME).blob(assembly_blob_name)
+  assembly_blob = storage_client.bucket(
+      _ASSEMBLIES_DOWNLOAD_BUCKET_NAME).get_blob(assembly_blob_name)
+  if assembly_blob.size > 5e8:
+    return None
+
   fast_parser = PDB.FastMMCIFParser()
   return fast_parser.get_structure(
       assembly_blob_name.removesuffix(".cif"),
@@ -88,6 +92,9 @@ def _ReadToTrainingFeatures(pdb_id, assembly_blob_name, pcl, lch):
   except Exception as e:
     logging.warning(
         'Constructing PDB Assembly failed with: {}'.format(str(e)))
+    return []
+
+  if assembly_structure is None:
     return []
 
   for m in assembly_structure.get_models():
@@ -163,7 +170,7 @@ def DownloadTrainingExamples(pid_assemblies, target_location, summary_location, 
         | 'Filter to Relevant Assemblies' >> beam.ParDo(RelevantAssembliesDoFn(
           lig_pairs_blob='lig_pairs.lst',
           resolution_threshold=resolution_threshold))
-        | 'Rebalance Data' >> beam.Reshuffle(num_buckets=1000)
+        | 'Rebalance Data' >> beam.Reshuffle()
         | 'Retrieve Examples' >> beam.ParDo(TrainingFeaturesDoFn(
             lig_pairs_blob='lig_pairs.lst',
             clusters_by_entity_blob=clusters_by_entity)))
