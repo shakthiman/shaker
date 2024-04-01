@@ -1,0 +1,8 @@
+workerPoolSpecs:
+  machineSpec:
+    machineType: cloud-tpu
+    acceleratorType: TPU_V2
+    acceleratorCount: 8
+  replicaCount: 1
+  containerSpec:
+    imageUri: gcr.io/shaker-388116/assembly-training:live
