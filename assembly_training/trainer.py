@@ -39,8 +39,9 @@ def main ():
     model=variational_model,
     optimizer=optimizer,
     save_frequency=500,
-    write_target='gs://variational_shaker_models/assembly_based_model_vertex_ai',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_vertex_ai',
+    write_target='gs://variational_shaker_models/assembly_based_model_prod',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod',
+    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod',
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step))
 
 if __name__ == "__main__":
