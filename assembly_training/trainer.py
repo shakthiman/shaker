@@ -15,7 +15,7 @@ def main ():
   tf.config.experimental_connect_to_cluster(cluster_resolver)
   tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
   strategy = tf.distribute.TPUStrategy(cluster_resolver)
-  print("All devices: ", tf.config.list_logical_devices('TPU')
+  print("All devices: ", tf.config.list_logical_devices('TPU'))
 
   client = storage.Client()
   summary_blob = client.bucket("unreplicated-training-data").blob(
