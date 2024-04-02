@@ -1,3 +1,8 @@
 steps:
-- name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '--tag=gcr.io/shaker-388116/assembly-training:live', '--file=./assembly_training/Dockerfile', '.']
+  # Docker Build
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '--tag=gcr.io/shaker-388116/assembly-training:live', '--file=./assembly_training/Dockerfile', '.']
+  # Docker Push
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',
+           'gcr.io/shaker-388116/assembly-training:live']
