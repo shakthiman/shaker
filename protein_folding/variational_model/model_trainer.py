@@ -6,37 +6,39 @@ import tensorflow as tf
 TrainStepInformation = collections.namedtuple(
         'TrainStepInformation', ['loss_information', 'grad_norm', 'grad_norm_by_source'])
 
-@tf.function(reduce_retracing=True)
-def _TrainStep(model, optimizer, training_data, beta):
-  with tf.GradientTape() as tape:
-    loss_information = model.compute_loss(
-        training_data=training_data,
-        training=True,
-        beta=beta)
-  trainable_weights = model.trainable_weights()
-  grads = tape.gradient(loss_information, trainable_weights)
-  optimizer.apply_gradients(zip(grads, trainable_weights))
-  grad_norm = functools.reduce(
-      lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
-  sources = (
-      ['conditioner'] * len(model._conditioner.trainable_weights()) +
-      ['decoder'] * len(model._decoder.trainable_weights()) +
-      ['encoder'] * len(model._encoder.trainable_weights()))
-  grad_norm_by_source = {}
-  for s,g in zip(sources, grads):
-    if s in grad_norm_by_source:
-      grad_norm_by_source[s] = tf.math.add(tf.norm(g), grad_norm_by_source[s])
-    else:
-      grad_norm_by_source[s] = tf.norm(g)
+@tf.function(reduce_retracing=True, jit_compile=True)
+def _TrainStep(model, strategy, optimizer, train_iterator, beta):
+  def step_fun(training_data, beta):
+    with tf.GradientTape() as tape:
+      loss_information = model.compute_loss(
+          training_data=training_data,
+          training=True,
+          beta=beta)
+    trainable_weights = model.trainable_weights()
+    grads = tape.gradient(loss_information, trainable_weights)
+    optimizer.apply_gradients(zip(grads, trainable_weights))
+    grad_norm = functools.reduce(
+        lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
+    sources = (
+        ['conditioner'] * len(model._conditioner.trainable_weights()) +
+        ['decoder'] * len(model._decoder.trainable_weights()) +
+        ['encoder'] * len(model._encoder.trainable_weights()))
+    grad_norm_by_source = {}
+    for s,g in zip(sources, grads):
+      if s in grad_norm_by_source:
+        grad_norm_by_source[s] = tf.math.add(tf.norm(g), grad_norm_by_source[s])
+      else:
+        grad_norm_by_source[s] = tf.norm(g)
 
-  return TrainStepInformation(
-          loss_information=loss_information,
-          grad_norm=grad_norm,
-          grad_norm_by_source=grad_norm_by_source)
+    return TrainStepInformation(
+            loss_information=loss_information,
+            grad_norm=grad_norm,
+            grad_norm_by_source=grad_norm_by_source)
+  return strategy.run(step_fun, (next(train_iterator), beta))
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
-    tensorboard_target, checkpoint_directory, beta_fn=lambda cpu_step: 1):
+    tensorboard_target, checkpoint_directory, strategy, beta_fn=lambda cpu_step: 1):
   ckpt = tf.train.Checkpoint(
       ck_step=tf.Variable(0, dtype=tf.int64),
       optimizer=optimizer,
@@ -63,9 +65,10 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
               'residue_names': [None, None],
               'atom_names': [None, None],
               'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
-  for step, training_data in tds.enumerate():
+  train_iterator = iter(tds)
+  while True:
     beta = beta_fn(ckpt.ck_step)
-    train_step_information = _TrainStep(model, optimizer, training_data, tf.constant(beta))
+    train_step_information = _TrainStep(model, strategy, optimizer, train_iterator, tf.constant(beta))
     if ckpt.ck_step % 100 == 0:
       with summary_writer.as_default():
         tf.summary.scalar('loss', train_step_information.loss_information.loss, step=ckpt.ck_step)
