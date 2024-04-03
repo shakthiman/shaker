@@ -8,10 +8,12 @@ from protein_folding.variational_model.models import sequence_latent_space_with_
 from google.cloud import storage
 
 def BetaAnneal(step):
-  return min(10.0, (step%2000)*1e-2)
+  return min(10.0, tf.cast(step%2000, tf.float32)*1e-2)
 
 def main ():
-  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu="local")
+  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
+          #tpu="local"
+                                                                       )
   tf.config.experimental_connect_to_cluster(cluster_resolver)
   tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
   strategy = tf.distribute.TPUStrategy(cluster_resolver)
