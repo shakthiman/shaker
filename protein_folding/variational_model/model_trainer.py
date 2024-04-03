@@ -38,7 +38,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
     tensorboard_target, checkpoint_directory, beta_fn=lambda cpu_step: 1):
   ckpt = tf.train.Checkpoint(
-      ck_step=tf.Variable(0),
+      ck_step=tf.Variable(0, dtype=tf.int64),
       optimizer=optimizer,
       conditioner=model._conditioner._model,
       decoder=model._decoder._model,
