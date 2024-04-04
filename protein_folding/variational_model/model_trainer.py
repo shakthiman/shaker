@@ -6,7 +6,7 @@ import tensorflow as tf
 TrainStepInformation = collections.namedtuple(
         'TrainStepInformation', ['loss_information', 'grad_norm', 'grad_norm_by_source'])
 
-@tf.function(reduce_retracing=True, jit_compile=True)
+@tf.function(reduce_retracing=True)
 def _TrainStep(model, strategy, optimizer, train_iterator, beta):
   def step_fun(training_data, beta):
     with tf.GradientTape() as tape:
@@ -30,11 +30,14 @@ def _TrainStep(model, strategy, optimizer, train_iterator, beta):
       else:
         grad_norm_by_source[s] = tf.norm(g)
 
-    return TrainStepInformation(
-            loss_information=loss_information,
-            grad_norm=grad_norm,
-            grad_norm_by_source=grad_norm_by_source)
-  return strategy.run(step_fun, (next(train_iterator), beta))
+    return (loss_information,
+            grad_norm,
+            grad_norm_by_source)
+  out = strategy.run(step_fun, (next(train_iterator), beta))
+  return TrainStepInformation(
+      loss_information=out[0],
+      grad_norm=out[1],
+      grad_norm_by_source=out[2]) 
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
@@ -62,9 +65,9 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         'normalized_coordinates': x['atom_coords'].to_tensor()}).padded_batch(
             batch_size,
             padded_shapes={
-              'residue_names': [None, None],
-              'atom_names': [None, None],
-              'normalized_coordinates': [None, None, 3]}).prefetch(prefetch_size)
+              'residue_names': [5, 10000],
+              'atom_names': [5, 10000],
+              'normalized_coordinates': [5, 10000, 3]}).prefetch(prefetch_size)
   train_iterator = iter(tds)
   while True:
     beta = beta_fn(ckpt.ck_step)
