@@ -6,23 +6,26 @@ import tensorflow as tf
 TrainStepInformation = collections.namedtuple(
         'TrainStepInformation', ['loss_information', 'grad_norm', 'grad_norm_by_source'])
 
+MODEL = None
+STRATEGY = None
+OPTIMIZER = None
 @tf.function(reduce_retracing=True)
-def _TrainStep(model, strategy, optimizer, train_iterator, beta):
+def _TrainStep(train_iterator, beta):
   def step_fun(training_data, beta):
     with tf.GradientTape() as tape:
-      loss_information = model.compute_loss(
+      loss_information = MODEL.compute_loss(
           training_data=training_data,
           training=True,
           beta=beta)
-    trainable_weights = model.trainable_weights()
+    trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss_information, trainable_weights)
-    optimizer.apply_gradients(zip(grads, trainable_weights))
+    OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
     grad_norm = functools.reduce(
         lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
     sources = (
-        ['conditioner'] * len(model._conditioner.trainable_weights()) +
-        ['decoder'] * len(model._decoder.trainable_weights()) +
-        ['encoder'] * len(model._encoder.trainable_weights()))
+        ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
+        ['decoder'] * len(MODEL._decoder.trainable_weights()) +
+        ['encoder'] * len(MODEL._encoder.trainable_weights()))
     grad_norm_by_source = {}
     for s,g in zip(sources, grads):
       if s in grad_norm_by_source:
@@ -33,7 +36,7 @@ def _TrainStep(model, strategy, optimizer, train_iterator, beta):
     return (loss_information,
             grad_norm,
             grad_norm_by_source)
-  out = strategy.run(step_fun, (next(train_iterator), beta))
+  out = STRATEGY.run(step_fun, (next(train_iterator), beta))
   return TrainStepInformation(
       loss_information=out[0],
       grad_norm=out[1],
@@ -42,13 +45,21 @@ def _TrainStep(model, strategy, optimizer, train_iterator, beta):
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
     tensorboard_target, checkpoint_directory, strategy, beta_fn=lambda cpu_step: 1):
+  global MODEL
+  global STRATEGY
+  global OPTIMIZER
+
+  MODEL = model
+  STRATEGY = strategy
+  OPTIMIZER = optimizer
+
   ckpt = tf.train.Checkpoint(
       ck_step=tf.Variable(0, dtype=tf.int64),
-      optimizer=optimizer,
-      conditioner=model._conditioner._model,
-      decoder=model._decoder._model,
-      encoder=model._encoder._model,
-      rotation_model=model._rotation_model)
+      optimizer=OPTIMIZER,
+      conditioner=MODEL._conditioner._model,
+      decoder=MODEL._decoder._model,
+      encoder=MODEL._encoder._model,
+      rotation_model=MODEL._rotation_model)
   manager = tf.train.CheckpointManager(ckpt, checkpoint_directory, max_to_keep=3)
   ckpt.restore(manager.latest_checkpoint)
   if manager.latest_checkpoint:
@@ -65,13 +76,13 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         'normalized_coordinates': x['atom_coords'].to_tensor()}).padded_batch(
             batch_size,
             padded_shapes={
-              'residue_names': [5, 10000],
-              'atom_names': [5, 10000],
-              'normalized_coordinates': [5, 10000, 3]}).prefetch(prefetch_size)
+              'residue_names': [5, 2000],
+              'atom_names': [5, 2000],
+              'normalized_coordinates': [5, 2000, 3]}).prefetch(prefetch_size)
   train_iterator = iter(tds)
   while True:
     beta = beta_fn(ckpt.ck_step)
-    train_step_information = _TrainStep(model, strategy, optimizer, train_iterator, tf.constant(beta))
+    train_step_information = _TrainStep(train_iterator, tf.constant(beta))
     if ckpt.ck_step % 100 == 0:
       with summary_writer.as_default():
         tf.summary.scalar('loss', train_step_information.loss_information.loss, step=ckpt.ck_step)
@@ -84,9 +95,9 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         for s, g in train_step_information.grad_norm_by_source.items():
           tf.summary.scalar('grad_norm_by_source_' + s, g, step=ckpt.ck_step)
     if ckpt.ck_step == 0:
-        model.save('{}/version_{}'.format(write_target, ckpt.ck_step))
+        MODEL.save('{}/version_{}'.format(write_target, ckpt.ck_step))
     elif ckpt.ck_step % save_frequency == 0:
-        model.save_weights('{}/version_{}'.format(write_target, ckpt.ck_step))
+        MODEL.save_weights('{}/version_{}'.format(write_target, ckpt.ck_step))
         save_path = manager.save()
         print("Saved checkpoint for step {}: {}".format(int(ckpt.ck_step), save_path))
     ckpt.ck_step.assign_add(1)

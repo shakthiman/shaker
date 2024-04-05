@@ -7,6 +7,7 @@ _COND_EMBEDDING_SIZE = 6
 _LATENT_EMBEDDING_SIZE = 30
 _AMINO_ACID_EMBEDDING_DIMS = 20
 _NUM_TRANSFORMERS = 10
+_ATOMS_PER_SEQUENCE = 2000
 
 def ShapeList(x):
   ps = x.get_shape().as_list()
@@ -136,7 +137,7 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
   straightened_features = StraightenMultipeptideSequence(base_features)
   straightened_mask = StraightenMultipeptideMask(atom_mask)
 
-  sequence_size = 5*10000
+  sequence_size = 5*_ATOMS_PER_SEQUENCE
   ideal_sequence_size = math.ceil(sequence_size/num_blocks) * num_blocks
   paddings = [[0, 0],
               [0, ideal_sequence_size-sequence_size],
@@ -197,7 +198,7 @@ def _DecoderTransformer(
 
   # Pad the sequence to be evenly divisible by num_blocks
   sequence_size = ShapeList(straightened_features)[1]
-  sequence_size = 5*10000
+  sequence_size = 5*_ATOMS_PER_SEQUENCE
   ideal_sequence_size = math.ceil(sequence_size/num_blocks) * num_blocks
   paddings = [[0, 0],
               [0, ideal_sequence_size-sequence_size],
@@ -251,13 +252,13 @@ class FinalEncoderLayer(tf.keras.layers.Layer):
 def EncoderModel():
   # The inputs.
   normalized_coordinates = tf.keras.Input(
-      shape=[5, 10000, 3],
+      shape=[5, _ATOMS_PER_SEQUENCE, 3],
       name='normalized_coordinates')
   atom_mask = tf.keras.Input(
-      shape=[5, 10000],
+      shape=[5, _ATOMS_PER_SEQUENCE],
       name='atom_mask')
   cond = tf.keras.Input(
-      shape=[5, 10000, _COND_EMBEDDING_SIZE],
+      shape=[5, _ATOMS_PER_SEQUENCE, _COND_EMBEDDING_SIZE],
       name='cond')
 
   # Compute Amino Acid Positional Embedding
@@ -270,7 +271,7 @@ def EncoderModel():
   transformer_outputs = _EncoderTransformer(
       base_features, atom_mask, num_blocks, 30)
   transformer_outputs = [
-      tf.ensure_shape(t, [None, 5, 10000, 30])
+      tf.ensure_shape(t, [None, 5, _ATOMS_PER_SEQUENCE, 30])
       for t in transformer_outputs]
   transformer_outputs = tf.keras.layers.concatenate(
       [tf.expand_dims(t, 1) for t in transformer_outputs],
@@ -316,14 +317,14 @@ class DecoderLSTM(tf.keras.layers.Layer):
 
 def DecoderModel():
   # The inputs.
-  z = tf.keras.Input(shape=[None, 5, 10000, _LATENT_EMBEDDING_SIZE], name='z')
+  z = tf.keras.Input(shape=[None, 5, _ATOMS_PER_SEQUENCE, _LATENT_EMBEDDING_SIZE], name='z')
   # Drop some of the latent layer to improve robustness.
   dropout_z = tf.keras.layers.Dropout(0.2)(z)
   atom_mask = tf.keras.Input(
-      shape=[5, 10000],
+      shape=[5, _ATOMS_PER_SEQUENCE],
       name='atom_mask')
   cond = tf.keras.Input(
-      shape=[5, 10000, _COND_EMBEDDING_SIZE],
+      shape=[5, _ATOMS_PER_SEQUENCE, _COND_EMBEDDING_SIZE],
       name='cond')
 
   z_list = tf.unstack(dropout_z, _NUM_TRANSFORMERS, axis=1)
@@ -342,7 +343,7 @@ def DecoderModel():
       num_blocks=num_blocks,
       channel_size=27)
   transformer_output = tf.ensure_shape(
-      transformer_output, [4, 5, 10000, 27])
+      transformer_output, [4, 5, _ATOMS_PER_SEQUENCE, 27])
   lstm_output = DecoderLSTM(64, 4)(transformer_output, tf.cast(atom_mask, tf.bool))
   loc = tf.keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
@@ -351,8 +352,8 @@ def DecoderModel():
       outputs=fdl(loc))
 
 def CondModel(residue_lookup_size, atom_lookup_size):
-  residue_names = tf.keras.Input(shape=(5, 10000), name='residue_names')
-  atom_names = tf.keras.Input(shape=(5, 10000), name='atom_names')
+  residue_names = tf.keras.Input(shape=(5, _ATOMS_PER_SEQUENCE), name='residue_names')
+  atom_names = tf.keras.Input(shape=(5, _ATOMS_PER_SEQUENCE), name='atom_names')
 
   residue_embeddings = tf.keras.layers.Embedding(
     input_dim=residue_lookup_size,
@@ -368,11 +369,11 @@ def CondModel(residue_lookup_size, atom_lookup_size):
   return tf.keras.Model(inputs=[residue_names, atom_names], outputs=cond_out)
 
 def RotationModel():
-  normalized_coordinates = tf.keras.Input(shape=[5, 10000, 3],
+  normalized_coordinates = tf.keras.Input(shape=[5, _ATOMS_PER_SEQUENCE, 3],
                                           name='normalized_coordinates')
-  atom_mask = tf.keras.Input(shape=[5, 10000],
+  atom_mask = tf.keras.Input(shape=[5, _ATOMS_PER_SEQUENCE],
                              name='atom_mask')
-  predicted_coordinates = tf.keras.Input(shape=[5, 10000, 3],
+  predicted_coordinates = tf.keras.Input(shape=[5, _ATOMS_PER_SEQUENCE, 3],
                                          name='predicted_coordinates')
 
   input_features = tf.keras.layers.concatenate(
