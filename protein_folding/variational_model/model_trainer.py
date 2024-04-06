@@ -79,6 +79,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
               'residue_names': [5, 2000],
               'atom_names': [5, 2000],
               'normalized_coordinates': [5, 2000, 3]}).prefetch(prefetch_size)
+  tds = STRATEGY.experimental_distribute_dataset(tds)
   train_iterator = iter(tds)
   while True:
     beta = beta_fn(ckpt.ck_step)

@@ -8,6 +8,8 @@ _LATENT_EMBEDDING_SIZE = 30
 _AMINO_ACID_EMBEDDING_DIMS = 20
 _NUM_TRANSFORMERS = 10
 _ATOMS_PER_SEQUENCE = 2000
+_BATCH_SIZE = 1
+_NUM_PEPTIDES = 5
 
 def ShapeList(x):
   ps = x.get_shape().as_list()
@@ -37,15 +39,13 @@ def StraightenMultipeptideSequence(x):
   x_shape = ShapeList(x)
   assert len(x_shape) == 4
   return tf.reshape(x,[
-    x_shape[0], # Batch size remains the same.
+    _BATCH_SIZE, # Batch size remains the same.
     -1, # Amino acid dimension.
     x_shape[3]])
 
 def StraightenMultipeptideMask(atom_mask):
-  mask_shape = ShapeList(atom_mask)
-  assert len(mask_shape) == 3
   return tf.reshape(atom_mask, [
-    mask_shape[0], # Batch size remains the same.
+    _BATCH_SIZE, # Batch size remains the same.
     -1 # Amino Acid dimension.
     ])
 
@@ -53,7 +53,7 @@ def RefactorX(x, n):
   x_shape = ShapeList(x)
   assert len(x_shape) == 3, len(x_shape)
   return tf.reshape(x, [
-    x_shape[0], # Batch size remains the same.
+    _BATCH_SIZE, # Batch size remains the same.
     -1, # Additional blocks are introduced.
     x_shape[1] // n, # Number of timesteps reduced by a factor of n.
     x_shape[2] # Embedding dimension does not change.
@@ -63,7 +63,7 @@ def RefactorXMask(x_mask, n):
   x_mask_shape = ShapeList(x_mask)
   assert len(x_mask_shape) == 2, len(x_mask_shape)
   return tf.reshape(x_mask, [
-    x_mask_shape[0], # Batch size remains the same.
+    _BATCH_SIZE, # Batch size remains the same.
     -1, # Additional blocks are introduced.
     x_mask_shape[1] // n # Number of timesteps reduced by a factor of n.
     ])
@@ -82,7 +82,7 @@ class CustomSelfAttention(tf.keras.layers.Layer):
           )
     return tf.stack([
       _apply_attention((input_tensor[i], input_mask[i]))
-      for i in range(4)])
+      for i in range(_BATCH_SIZE)])
 
 def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
   transposed_x = tf.transpose(refactored_x, perm)
@@ -98,11 +98,12 @@ def AttentionLayer(num_blocks, num_heads, key_dim, inputs, inputs_mask):
   global_self_attention = TransposeAndAttend(
       CustomSelfAttention(num_heads, key_dim), refactored_x,
       refactored_mask, [0, 2, 1, 3])
+  input_shape = ShapeList(inputs)
   return tf.keras.layers.LayerNormalization()(
       tf.keras.layers.Add()([
         inputs,
-        tf.reshape(local_self_attention, ShapeList(inputs)),
-        tf.reshape(global_self_attention, ShapeList(inputs))]))
+        tf.reshape(local_self_attention, [_BATCH_SIZE] + input_shape[1:]),
+        tf.reshape(global_self_attention, [_BATCH_SIZE] + input_shape[1:])]))
 
 def FeedForwardLayer(num_layers, output_size, inputs):
   t = inputs
@@ -162,7 +163,7 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
       transformer_outputs, num_transformer_channels, 2)
 
   transformer_outputs = [tf.reshape(t,
-    [original_shape[0], original_shape[1], original_shape[2], -1])
+    [_BATCH_SIZE, original_shape[1], original_shape[2], -1])
     for t in transformer_outputs]
   return transformer_outputs
 
@@ -222,7 +223,7 @@ def _DecoderTransformer(
       channel_size=channel_size)
   transformer_outputs = transformer_outputs[:,:sequence_size,:]
   transformer_outputs = tf.reshape(transformer_outputs,
-      [original_shape[0], original_shape[1], original_shape[2], -1])
+      [_BATCH_SIZE, original_shape[1], original_shape[2], -1])
   return transformer_outputs
 
 def log_sigma2(gamma):
@@ -343,8 +344,8 @@ def DecoderModel():
       num_blocks=num_blocks,
       channel_size=27)
   transformer_output = tf.ensure_shape(
-      transformer_output, [4, 5, _ATOMS_PER_SEQUENCE, 27])
-  lstm_output = DecoderLSTM(64, 4)(transformer_output, tf.cast(atom_mask, tf.bool))
+      transformer_output, [_BATCH_SIZE, 5, _ATOMS_PER_SEQUENCE, 27])
+  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
   loc = tf.keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
