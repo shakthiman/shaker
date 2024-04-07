@@ -53,13 +53,14 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   STRATEGY = strategy
   OPTIMIZER = optimizer
 
-  ckpt = tf.train.Checkpoint(
-      ck_step=tf.Variable(0, dtype=tf.int64),
-      optimizer=OPTIMIZER,
-      conditioner=MODEL._conditioner._model,
-      decoder=MODEL._decoder._model,
-      encoder=MODEL._encoder._model,
-      rotation_model=MODEL._rotation_model)
+  with STRATEGY.scope():
+    ckpt = tf.train.Checkpoint(
+        ck_step=tf.Variable(0, dtype=tf.int64),
+        optimizer=OPTIMIZER,
+        conditioner=MODEL._conditioner._model,
+        decoder=MODEL._decoder._model,
+        encoder=MODEL._encoder._model,
+        rotation_model=MODEL._rotation_model)
   manager = tf.train.CheckpointManager(ckpt, checkpoint_directory, max_to_keep=3)
   ckpt.restore(manager.latest_checkpoint)
   if manager.latest_checkpoint:
@@ -76,9 +77,9 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         'normalized_coordinates': x['atom_coords'].to_tensor()}).padded_batch(
             batch_size,
             padded_shapes={
-              'residue_names': [5, 2000],
-              'atom_names': [5, 2000],
-              'normalized_coordinates': [5, 2000, 3]}).prefetch(prefetch_size)
+              'residue_names': [1, 2000],
+              'atom_names': [1, 2000],
+              'normalized_coordinates': [1, 2000, 3]}).prefetch(prefetch_size)
   tds = STRATEGY.experimental_distribute_dataset(tds)
   train_iterator = iter(tds)
   while True:

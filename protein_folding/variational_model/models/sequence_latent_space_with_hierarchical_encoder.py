@@ -8,8 +8,8 @@ _LATENT_EMBEDDING_SIZE = 30
 _AMINO_ACID_EMBEDDING_DIMS = 20
 _NUM_TRANSFORMERS = 10
 _ATOMS_PER_SEQUENCE = 2000
-_BATCH_SIZE = 1
-_NUM_PEPTIDES = 5
+_BATCH_SIZE = 2
+_NUM_PEPTIDES = 1
 
 def AminoAcidPositionalEmbedding(cond):
   pos_indices = tf.expand_dims(
@@ -166,7 +166,7 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
     transformer_input = tf.ensure_shape(transformer_input,
         [None, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
-        num_blocks, num_heads, key_dim, ideal_sequence_size, channel_size, transformer_input, inputs_mask)
+        num_blocks, num_heads, key_dim, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE, transformer_input, inputs_mask)
     conv_inputs = tf.keras.layers.Conv1D(32, 100, padding='same')(
         transformer_input)
     x = FeedForwardLayer(num_dnn_layers, channel_size,
@@ -177,8 +177,8 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
 def _DecoderTransformer(
     base_features, z_list, atom_mask, num_blocks, channel_size):
   # Straighten, Attend, and Reshape
-  straightened_features = StraightenMultipeptideSequence(base_features)
-  straightened_z_list = [StraightenMultipeptideSequence(z) for z in z_list]
+  straightened_features = StraightenMultipeptideSequence(base_features, channel_size)
+  straightened_z_list = [StraightenMultipeptideSequence(z, _LATENT_EMBEDDING_SIZE) for z in z_list]
   straightened_mask = StraightenMultipeptideMask(atom_mask)
 
   # Pad the sequence to be evenly divisible by num_blocks
