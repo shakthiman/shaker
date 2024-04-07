@@ -338,9 +338,8 @@ def DecoderModel():
       channel_size=base_embedding_size)
   transformer_output = tf.ensure_shape(
       transformer_output, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
-  #lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
-  #loc = tf.keras.layers.Dense(3)(lstm_output)
-  loc = tf.keras.layers.Dense(3)(transformer_output)
+  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
+  loc = tf.keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
@@ -370,26 +369,18 @@ def RotationModel():
                              name='atom_mask')
   predicted_coordinates = tf.keras.Input(shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3],
                                          name='predicted_coordinates')
-  #input_features = tf.keras.layers.concatenate(
-  #    [normalized_coordinates, predicted_coordinates])
-  #straightened_features = StraightenMultipeptideSequence(input_features, 6)
-  #straightened_mask = StraightenMultipeptideMask(atom_mask)
-  #straightened_features = (straightened_features *
-  #                         tf.expand_dims(straightened_mask, -1))
-  #straightened_features = tf.keras.layers.Conv1D(filters=64,
-  #                                               kernel_size=100)(
-  #                                                   straightened_features)
-  #straightened_features = tf.keras.layers.AveragePooling1D(100)(
-  #    straightened_features)
-
-  #prediction = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64))(
-  #    inputs=straightened_features)
-  #prediction = tf.keras.layers.Dense(64, activation='gelu')(prediction)
-  #prediction = tf.keras.layers.Dense(3)(prediction)
-  test_straightened_coordinates = StraightenMultipeptideSequence(normalized_coordinates, 3)
-  test_rotation = tf.reduce_max(test_straightened_coordinates, 1)
+  input_features = tf.keras.layers.concatenate(
+      [normalized_coordinates, predicted_coordinates])
+  straightened_features = StraightenMultipeptideSequence(input_features, 6)
+  straightened_mask = StraightenMultipeptideMask(atom_mask)
+  straightened_features = (straightened_features *
+                           tf.expand_dims(straightened_mask, -1))
+  prediction = tf.keras.layers.Dense(3)(tf.keras.layers.Dense(100, 'gelu')(
+      tf.keras.layers.Dense(100, 'gelu')(straightened_features)))
+  prediction = prediction * tf.expand_dims(straightened_mask, -1)
+  prediction = tf.math.reduce_sum(prediction, axis=1) / tf.expand_dims(tf.math.reduce_sum(straightened_mask, axis=1), -1)
   return tf.keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
-                        outputs=tf.keras.layers.Dense(3)(test_rotation))
+                        outputs=prediction)
 
 MODEL_FOR_TRAINING = lambda vocab: model.VariationalModel(
     model.Conditioner(
