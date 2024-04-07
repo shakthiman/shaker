@@ -8,7 +8,7 @@ from protein_folding.variational_model.models import sequence_latent_space_with_
 from google.cloud import storage
 
 def BetaAnneal(step):
-  return min(10.0, tf.cast(step%2000, tf.float32)*1e-2)
+  return min(10.0, float(step%2000)*1e-2)
 
 def main ():
   cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(

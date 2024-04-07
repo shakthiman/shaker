@@ -1,5 +1,6 @@
 import math
 import tensorflow as tf
+import random
 
 from protein_folding.variational_model import model
 
@@ -32,13 +33,13 @@ def PeptideIndx():
 def StraightenMultipeptideSequence(x, embedding_size):
   return tf.reshape(x,[
     _BATCH_SIZE, # Batch size remains the same.
-    -1, # Amino acid dimension.
+    _NUM_PEPTIDES*_ATOMS_PER_SEQUENCE, # Amino acid dimension.
     embedding_size])
 
 def StraightenMultipeptideMask(atom_mask):
   return tf.reshape(atom_mask, [
     _BATCH_SIZE, # Batch size remains the same.
-    -1 # Amino Acid dimension.
+    _NUM_PEPTIDES*_ATOMS_PER_SEQUENCE # Amino Acid dimension.
     ])
 
 def RefactorX(x, timesteps, embedding_size, n):
@@ -86,19 +87,24 @@ def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, in
   global_self_attention = TransposeAndAttend(
       CustomSelfAttention(num_heads, key_dim), refactored_x,
       refactored_mask, [0, 2, 1, 3])
-  return tf.keras.layers.LayerNormalization()(
+  return tf.keras.layers.LayerNormalization(name='layer-normalization-1-'+str(random.randint(0, 10000)),
+                                            axis=[1,2])(
       tf.keras.layers.Add()([
         inputs,
         tf.reshape(local_self_attention, [_BATCH_SIZE, timesteps, embedding_size]),
         tf.reshape(global_self_attention, [_BATCH_SIZE, timesteps, embedding_size])]))
 
-def FeedForwardLayer(num_layers, output_size, inputs):
+def FeedForwardLayer(num_layers, ideal_sequence_size, output_size, inputs):
   t = inputs
   for i in range(num_layers):
     t = tf.keras.layers.Dense(100, 'gelu')(t)
   t = tf.keras.layers.Dense(output_size)(t)
-  return tf.keras.layers.LayerNormalization()(
-      tf.keras.layers.Add()([inputs, t]))
+  t = tf.ensure_shape(t, [_BATCH_SIZE, ideal_sequence_size, output_size])
+  added_val = tf.keras.layers.Add()([inputs, t])
+  added_val = tf.ensure_shape(added_val, [_BATCH_SIZE, ideal_sequence_size, output_size])
+  return tf.keras.layers.LayerNormalization(name='layer-normalization-2-'+str(random.randint(0, 10000)),
+                                            axis=[1,2])(
+      added_val)
 
 def EncoderTransformerLayer(num_transformers, num_blocks, num_heads, key_dim,
     num_dnn_layers, ideal_sequence_size, output_size, inputs, inputs_mask):
@@ -106,7 +112,8 @@ def EncoderTransformerLayer(num_transformers, num_blocks, num_heads, key_dim,
   x_list = []
   for i in range(num_transformers):
     x = AttentionLayer(num_blocks, num_heads, key_dim, ideal_sequence_size, output_size, x, inputs_mask)
-    x = FeedForwardLayer(num_dnn_layers, output_size, x)
+    x = tf.ensure_shape(x, [_BATCH_SIZE, ideal_sequence_size, output_size])
+    x = FeedForwardLayer(num_dnn_layers, ideal_sequence_size, output_size, x)
     x_list.append(x)
   return x_list
 
@@ -130,7 +137,7 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
               [0, 0]]
   padded_features = tf.pad(straightened_features, paddings)
   padded_features = tf.ensure_shape(padded_features,
-      [None, ideal_sequence_size, num_transformer_channels])
+      [_BATCH_SIZE, ideal_sequence_size, num_transformer_channels])
   padded_mask = tf.pad(straightened_mask, [
     [0, 0],
     [0, ideal_sequence_size-sequence_size]])
@@ -164,12 +171,13 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
     transformer_input = tf.keras.layers.concatenate(
         [x, z])
     transformer_input = tf.ensure_shape(transformer_input,
-        [None, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE])
+        [_BATCH_SIZE, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
         num_blocks, num_heads, key_dim, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE, transformer_input, inputs_mask)
     conv_inputs = tf.keras.layers.Conv1D(32, 100, padding='same')(
         transformer_input)
-    x = FeedForwardLayer(num_dnn_layers, channel_size,
+    conv_inputs = tf.ensure_shape(conv_inputs, [_BATCH_SIZE, ideal_sequence_size, 32])
+    x = FeedForwardLayer(num_dnn_layers, ideal_sequence_size, channel_size,
         tf.keras.layers.Dense(channel_size)(
             tf.keras.layers.concatenate([transformer_input, conv_inputs])))
   return x
@@ -189,7 +197,7 @@ def _DecoderTransformer(
               [0, 0]]
   padded_features = tf.pad(straightened_features, paddings)
   padded_features = tf.ensure_shape(padded_features,
-      [None, ideal_sequence_size, channel_size])
+      [_BATCH_SIZE, ideal_sequence_size, channel_size])
   padded_z_list = [tf.pad(z, paddings) for z in straightened_z_list]
   padded_mask = tf.pad(straightened_mask, [
     [0, 0],
@@ -330,8 +338,9 @@ def DecoderModel():
       channel_size=base_embedding_size)
   transformer_output = tf.ensure_shape(
       transformer_output, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
-  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
-  loc = tf.keras.layers.Dense(3)(lstm_output)
+  #lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
+  #loc = tf.keras.layers.Dense(3)(lstm_output)
+  loc = tf.keras.layers.Dense(3)(transformer_output)
   fdl = FinalDecoderLayer(1.0)
   return tf.keras.Model(
       inputs=[z, atom_mask, cond],
@@ -361,25 +370,26 @@ def RotationModel():
                              name='atom_mask')
   predicted_coordinates = tf.keras.Input(shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3],
                                          name='predicted_coordinates')
+  #input_features = tf.keras.layers.concatenate(
+  #    [normalized_coordinates, predicted_coordinates])
+  #straightened_features = StraightenMultipeptideSequence(input_features, 6)
+  #straightened_mask = StraightenMultipeptideMask(atom_mask)
+  #straightened_features = (straightened_features *
+  #                         tf.expand_dims(straightened_mask, -1))
+  #straightened_features = tf.keras.layers.Conv1D(filters=64,
+  #                                               kernel_size=100)(
+  #                                                   straightened_features)
+  #straightened_features = tf.keras.layers.AveragePooling1D(100)(
+  #    straightened_features)
 
-  input_features = tf.keras.layers.concatenate(
-      [normalized_coordinates, predicted_coordinates])
-  straightened_features = StraightenMultipeptideSequence(input_features, 6)
-  straightened_mask = StraightenMultipeptideMask(atom_mask)
-  straightened_features = (straightened_features *
-                           tf.expand_dims(straightened_mask, -1))
-  straightened_features = tf.keras.layers.Conv1D(filters=64,
-                                                 kernel_size=100)(
-                                                     straightened_features)
-  straightened_features = tf.keras.layers.AveragePooling1D(100)(
-      straightened_features)
-
-  prediction = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64))(
-      inputs=straightened_features)
-  prediction = tf.keras.layers.Dense(64, activation='gelu')(prediction)
-  prediction = tf.keras.layers.Dense(3)(prediction)
+  #prediction = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64))(
+  #    inputs=straightened_features)
+  #prediction = tf.keras.layers.Dense(64, activation='gelu')(prediction)
+  #prediction = tf.keras.layers.Dense(3)(prediction)
+  test_straightened_coordinates = StraightenMultipeptideSequence(normalized_coordinates, 3)
+  test_rotation = tf.reduce_max(test_straightened_coordinates, 1)
   return tf.keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
-                        outputs=prediction)
+                        outputs=tf.keras.layers.Dense(3)(test_rotation))
 
 MODEL_FOR_TRAINING = lambda vocab: model.VariationalModel(
     model.Conditioner(
