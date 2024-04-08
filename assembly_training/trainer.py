@@ -36,16 +36,16 @@ def main ():
   print('Num Replicas: ', strategy.num_replicas_in_sync)
   model_trainer.Train(
     ds=ds,
-    shuffle_size=10,
+    shuffle_size=10000,
     batch_size=2*strategy.num_replicas_in_sync,
     prefetch_size=10,
     pdb_vocab=pdb_vocab.PDBVocab(summary_blob),
     model=variational_model,
     optimizer=optimizer,
-    save_frequency=500,
-    write_target='gs://variational_shaker_models/assembly_based_model_test2',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_test2',
-    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_test2',
+    save_frequency=1000,
+    write_target='gs://variational_shaker_models/assembly_based_model_prod_hope',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_hope',
+    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_hope',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step))
 
