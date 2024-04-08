@@ -1,4 +1,5 @@
 import collections
+import datetime
 
 import functools
 import tensorflow as tf
@@ -9,8 +10,11 @@ TrainStepInformation = collections.namedtuple(
 MODEL = None
 STRATEGY = None
 OPTIMIZER = None
+BETA_FN = None
+TRAIN_STEPS = 1
+
 @tf.function(reduce_retracing=True)
-def _TrainStep(train_iterator, beta):
+def _TrainStep(train_iterator, cpu_step):
   def step_fun(training_data, beta):
     with tf.GradientTape() as tape:
       loss_information = MODEL.compute_loss(
@@ -20,25 +24,25 @@ def _TrainStep(train_iterator, beta):
     trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss_information, trainable_weights)
     OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
-    #grad_norm = functools.reduce(
-    #    lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
-    #sources = (
-    #    ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
-    #    ['decoder'] * len(MODEL._decoder.trainable_weights()) +
-    #    ['encoder'] * len(MODEL._encoder.trainable_weights()))
-    #grad_norm_by_source = {}
-    #for s,g in zip(sources, grads):
-    #  if s in grad_norm_by_source:
-    #    grad_norm_by_source[s] = tf.math.add(tf.norm(g), grad_norm_by_source[s])
-    #  else:
-    #    grad_norm_by_source[s] = tf.norm(g)
+    grad_norm = functools.reduce(
+        lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
+    sources = (
+        ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
+        ['decoder'] * len(MODEL._decoder.trainable_weights()) +
+        ['encoder'] * len(MODEL._encoder.trainable_weights()))
+    grad_norm_by_source = {}
+    for s,g in zip(sources, grads):
+      if s in grad_norm_by_source:
+        grad_norm_by_source[s] = tf.math.add(tf.norm(g), grad_norm_by_source[s])
+      else:
+        grad_norm_by_source[s] = tf.norm(g)
 
-    return loss_information.loss
     return TrainStepInformation(
             loss_information=loss_information,
             grad_norm=grad_norm,
             grad_norm_by_source=grad_norm_by_source)
-  out = STRATEGY.run(step_fun, (next(train_iterator), beta))
+  for i in range(TRAIN_STEPS):
+    out = STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + i)))
   return out
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
@@ -47,10 +51,12 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   global MODEL
   global STRATEGY
   global OPTIMIZER
+  global BETA_FN
 
   MODEL = model
   STRATEGY = strategy
   OPTIMIZER = optimizer
+  BETA_FN = beta_fn
 
   with STRATEGY.scope():
     ckpt = tf.train.Checkpoint(
@@ -76,17 +82,18 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         'normalized_coordinates': x['atom_coords'].to_tensor()}).padded_batch(
             batch_size,
             padded_shapes={
-              'residue_names': [1, 2000],
-              'atom_names': [1, 2000],
-              'normalized_coordinates': [1, 2000, 3]}).prefetch(prefetch_size)
+              'residue_names': [4, 6000],
+              'atom_names': [4, 6000],
+              'normalized_coordinates': [4, 6000, 3]}).prefetch(prefetch_size)
   tds = STRATEGY.experimental_distribute_dataset(tds)
   train_iterator = iter(tds)
   cpu_step = ckpt.ck_step.numpy()
   while True:
-    beta = beta_fn(cpu_step)
-    train_step_information = _TrainStep(train_iterator, tf.constant(beta))
-    #train_step_information = STRATEGY.experimental_local_results(train_step_information)
+    print('Wall Time Start: ', datetime.datetime.now())
+    train_step_information = _TrainStep(train_iterator, tf.constant(cpu_step))
+    train_step_information = STRATEGY.experimental_local_results(train_step_information)
     print(train_step_information)
+    print('Wall Time Finish: ', datetime.datetime.now())
     if cpu_step % 100 == 0:
       with summary_writer.as_default():
         tf.summary.scalar('loss', train_step_information[0].loss_information.loss, step=cpu_step)
@@ -104,5 +111,5 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         MODEL.save_weights('{}/version_{}'.format(write_target, cpu_step))
         save_path = manager.save()
         print("Saved checkpoint for step {}: {}".format(int(cpu_step), save_path))
-    cpu_step += 1
+    cpu_step += TRAIN_STEPS
     ckpt.ck_step.assign(cpu_step)
