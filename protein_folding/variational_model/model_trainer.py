@@ -11,7 +11,7 @@ MODEL = None
 STRATEGY = None
 OPTIMIZER = None
 BETA_FN = None
-TRAIN_STEPS = 1
+TRAIN_STEPS = 100
 
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
@@ -41,9 +41,9 @@ def _TrainStep(train_iterator, cpu_step):
             loss_information=loss_information,
             grad_norm=grad_norm,
             grad_norm_by_source=grad_norm_by_source)
-  for i in range(TRAIN_STEPS):
-    out = STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + i)))
-  return out
+  for i in tf.range(TRAIN_STEPS-1, dtype=tf.int64):
+    STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + i)))
+  return STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + TRAIN_STEPS - 1)))
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
