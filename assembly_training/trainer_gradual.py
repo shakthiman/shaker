@@ -8,8 +8,8 @@ from protein_folding.variational_model.models import sequence_latent_space_with_
 from google.cloud import storage
 
 def BetaAnneal(step):
-  max_val_for_period = 1.0 + 0.4*tf.cast(
-      tf.math.floordiv(step, 2000), tf.float32)
+  max_val_for_period = tf.math.minimum(10.0, 1.0 + 0.4*tf.cast(
+      tf.math.floordiv(step, 2000), tf.float32))
   inc_per_step = max_val_for_period/1000
   return tf.math.minimum(max_val_for_period, tf.cast(step%2000, tf.float32)*inc_per_step)
 
