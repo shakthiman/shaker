@@ -386,6 +386,7 @@ def RotationModel():
                         outputs=prediction)
 
 def MODEL_FOR_TRAINING(vocab, config):
+  global _CONFIG
   _CONFIG = config
   return model.VariationalModel(
       model.Conditioner(
