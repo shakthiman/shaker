@@ -237,9 +237,10 @@ class FinalEncoderLayer(tf.keras.layers.Layer):
 
   def call(self, normalized_coordinates):
     a = 1.0
+    logvar = 0
     if _CONFIG.get('scale_coordinates', True):
       a = alpha(self._gamma_variable)
-    logvar = log_sigma2(self._gamma_variable)
+      logvar = log_sigma2(self._gamma_variable)
     return tf.keras.layers.concatenate(
         inputs=[a*normalized_coordinates, logvar*tf.ones_like(normalized_coordinates)],
         axis=1)
