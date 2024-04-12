@@ -11,6 +11,7 @@ _NUM_TRANSFORMERS = 10
 _ATOMS_PER_SEQUENCE = 6000
 _BATCH_SIZE = 2
 _NUM_PEPTIDES = 4
+_CONFIG = None
 
 def AminoAcidPositionalEmbedding(cond):
   pos_indices = tf.expand_dims(
@@ -235,7 +236,9 @@ class FinalEncoderLayer(tf.keras.layers.Layer):
     self._gamma_variable = tf.Variable(self._initial_gamma_value, name='gamma')
 
   def call(self, normalized_coordinates):
-    a = alpha(self._gamma_variable)
+    a = 1.0
+    if _CONFIG.get('scale_coordinates', True):
+      a = alpha(self._gamma_variable)
     logvar = log_sigma2(self._gamma_variable)
     return tf.keras.layers.concatenate(
         inputs=[a*normalized_coordinates, logvar*tf.ones_like(normalized_coordinates)],
@@ -382,9 +385,11 @@ def RotationModel():
   return tf.keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
                         outputs=prediction)
 
-MODEL_FOR_TRAINING = lambda vocab: model.VariationalModel(
-    model.Conditioner(
-      CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
-    model.Decoder(DecoderModel()),
-    model.Encoder(EncoderModel()),
-    RotationModel())
+def MODEL_FOR_TRAINING(vocab, config):
+  _CONFIG = config
+  return model.VariationalModel(
+      model.Conditioner(
+        CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
+      model.Decoder(DecoderModel()),
+      model.Encoder(EncoderModel()),
+      RotationModel())
