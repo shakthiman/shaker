@@ -167,7 +167,11 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
   # One layer per set of latent variables.
   num_layers = len(z_list)
 
-  for i in range(num_layers-1, -1, -1):
+  encoder_indices = range(num_layers-1, -1, -1)
+  if _CONFIG.get('flip_encoder_processing', False):
+    encoder_indices = range(num_layers)
+
+  for i in encoder_indices:
     z = z_list[i]
     transformer_input = tf.keras.layers.concatenate(
         [x, z])
