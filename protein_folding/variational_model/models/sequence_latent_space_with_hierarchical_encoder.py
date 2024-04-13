@@ -237,7 +237,8 @@ class FinalEncoderLayer(tf.keras.layers.Layer):
     self._initial_gamma_value = initial_gamma_value
 
   def build(self, input_shape):
-    self._gamma_variable = tf.Variable(self._initial_gamma_value, name='gamma')
+    if _CONFIG.get('scale_coordinates', True):
+      self._gamma_variable = tf.Variable(self._initial_gamma_value, name='gamma')
 
   def call(self, normalized_coordinates):
     a = 1.0
