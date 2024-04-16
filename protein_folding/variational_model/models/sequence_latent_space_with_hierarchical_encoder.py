@@ -429,11 +429,11 @@ def LocalRotationModel():
   local_normalized_coordinates_mean_removed = local_normalized_coordinates - (
       tf.math.reduce_sum(
         local_normalized_coordinates, axis=-2,keepdims=True) /
-      tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+      tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
   local_predicted_coordinates_mean_removed = local_predicted_coordinates - (
       tf.math.reduce_sum(
         local_predicted_coordinates, axis=-2,keepdims=True) /
-      tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+      tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
 
 
   input_features = tf.keras.layers.concatenate([
