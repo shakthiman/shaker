@@ -101,7 +101,7 @@ class Encoder(object):
     _SaveWeights(self._model, location)
 
 class LocalTransformationModel(object):
-  def __init__(local_rotation_model, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
+  def __init__(self, local_rotation_model, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
     self._local_rotation_model = local_rotation_model
     self._local_coordinates_fn = local_coordinates_fn
     self._local_mask_fn = local_mask_fn
