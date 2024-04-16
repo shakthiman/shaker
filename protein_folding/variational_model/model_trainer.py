@@ -65,7 +65,8 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         conditioner=MODEL._conditioner._model,
         decoder=MODEL._decoder._model,
         encoder=MODEL._encoder._model,
-        rotation_model=MODEL._rotation_model)
+        rotation_model=MODEL._rotation_model,
+        local_transformation_model=MODEL._local_transformation_model._local_rotation_model)
   manager = tf.train.CheckpointManager(ckpt, checkpoint_directory, max_to_keep=3)
   ckpt.restore(manager.latest_checkpoint)
   if manager.latest_checkpoint:
@@ -98,10 +99,12 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
       with summary_writer.as_default():
         tf.summary.scalar('loss', train_step_information[0].loss_information.loss, step=cpu_step)
         tf.summary.scalar('loss_beta_1', train_step_information[0].loss_information.loss_beta_1, step=cpu_step)
+        tf.summary.scalar('local_logpx_z', train_step_information[0].loss_information.local_logpx_z, step=cpu_step)
         tf.summary.scalar('logpx_z', train_step_information[0].loss_information.logpx_z, step=cpu_step)
         tf.summary.scalar('logpz', train_step_information[0].loss_information.logpz, step=cpu_step)
         tf.summary.scalar('logqz_x', train_step_information[0].loss_information.logqz_x, step=cpu_step)
         tf.summary.scalar('diff_mae', train_step_information[0].loss_information.diff_mae, step=cpu_step)
+        tf.summary.scalar('local_diff_mae', train_step_information[0].loss_information.local_diff_mae, step=cpu_step)
         tf.summary.scalar('grad_norm', train_step_information[0].grad_norm, step=cpu_step)
         for s, g in train_step_information[0].grad_norm_by_source.items():
           tf.summary.scalar('grad_norm_by_source_' + s, g, step=cpu_step)

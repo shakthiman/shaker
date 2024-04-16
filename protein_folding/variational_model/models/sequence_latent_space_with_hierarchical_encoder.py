@@ -13,6 +13,8 @@ _BATCH_SIZE = 2
 _NUM_PEPTIDES = 4
 _CONFIG = None
 
+_LOCAL_ATOMS_SIZE = 100
+
 def AminoAcidPositionalEmbedding(cond):
   pos_indices = tf.expand_dims(
       tf.expand_dims(tf.expand_dims(
@@ -391,6 +393,62 @@ def RotationModel():
   return tf.keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
                         outputs=prediction)
 
+def GlobalCoordinates(local_normalized_coordinates):
+  local_normalized_coordinates = tf.ensure_shape(
+      local_normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, _LOCAL_ATOMS_SIZE, 3])
+  return tf.reshape(local_normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+
+def LocalCoordinates(normalized_coordinates):
+  normalized_coordinates = tf.ensure_shape(
+      normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+  return tf.reshape(normalized_coordinates,
+                    [_BATCH_SIZE,
+                     _NUM_PEPTIDES,
+                     _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE,
+                     _LOCAL_ATOMS_SIZE, 3])
+
+def LocalMask(atom_mask):
+  atom_mask = tf.ensure_shape(
+      atom_mask, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE])
+  return tf.reshape(normalized_coordinates,
+                    [_BATCH_SIZE,
+                     _NUM_PEPTIDES,
+                     _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE,
+                     _LOCAL_ATOMS_SIZE])
+
+def LocalRotationModel():
+  local_normalized_coordinates = tf.keras.Input(
+      shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, _LOCAL_ATOMS_SIZE, 3],
+      name='local_normalized_coordinates')
+  local_atom_mask = tf.keras.Input(shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, _LOCAL_ATOMS_SIZE],
+                                   name='local_atom_mask')
+  local_predicted_coordinates = tf.keras.Input(
+      shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, _LOCAL_ATOMS_SIZE, 3],
+      name='local_predicted_coordinates')
+
+  local_normalized_coordinates_mean_removed = local_normalized_coordinates - (
+      tf.math.reduce_sum(
+        local_normalized_coordinates, axis=-2,keepdims=True) /
+      tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+  local_predicted_coordinates_mean_removed = local_predicted_coordinates - (
+      tf.math.reduce_sum(
+        local_predicted_coordinates, axis=-2,keepdims=True) /
+      tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+
+
+  input_features = tf.keras.layers.concatenate([
+    local_normalized_coordinates_mean_removed,
+    local_predicted_coordinates_mean_removed])
+
+  prediction = tf.keras.layers.Dense(3)(tf.keras.layers.Dense(100, 'gelu')(
+      tf.keras.layers.Dense(100, 'gelu')(input_features)))
+  prediction = tf.math.reduce_sum(prediction, -2) / tf.math.reduce_sum(
+      local_atom_mask, axis=-1, keepdims=True)
+
+  prediction = tf.ensure_shape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
+  return tf.keras.Model(inputs=[local_normalized_coordinates, local_atom_mask, local_predicted_coordinates],
+                        outputs=prediction)
+
 def MODEL_FOR_TRAINING(vocab, config):
   global _CONFIG
   _CONFIG = config
@@ -399,4 +457,5 @@ def MODEL_FOR_TRAINING(vocab, config):
         CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
       model.Decoder(DecoderModel()),
       model.Encoder(EncoderModel()),
-      RotationModel())
+      RotationModel(),
+      LocalTransformationModel(LocalRotationModel(), LocalCoordinates, LocalMask, GlobalCoordinates) if config.get('should_do_local_transform', False) else None)

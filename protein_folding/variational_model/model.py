@@ -100,14 +100,61 @@ class Encoder(object):
   def save_weights(self, location):
     _SaveWeights(self._model, location)
 
+class LocalTransformationModel(object):
+  def __init__(local_rotation_model, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
+    self._local_rotation_model = local_rotation_model
+    self._local_coordinates_fn = local_coordinates_fn
+    self._local_mask_fn = local_mask_fn
+    self._global_coordinates_fn = global_coordinates_fn
+
+  # Returns the normalized_coordinates rotated as close as possible to the predicted_coordinates.
+  def local_transform(self, normalized_coordinates, predicted_coordinates, atom_mask):
+    local_normalized_coordinates = self._local_coordinates_fn(normalized_coordinates)
+    local_atom_mask = self._local_mask_fn(atom_mask)
+    local_predicted_coordinates = self._local_coordinates_fn(predicted_coordinates)
+
+    local_rotations = self._local_rotation_model({
+      'local_normalized_coordinates': local_normalized_coordinates,
+      'local_atom_mask': local_atom_mask,
+      'local_predicted_coordinates': local_predicted_coordinates
+      })
+    local_rotations = tf.ensure_shape(local_rotations, [None, None, None, 3])
+
+    local_normalized_coordinates = local_normalized_coordinates - (
+      tf.math.reduce_sum(
+        local_normalized_coordinates, axis=-2,keepdims=True) /
+      tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+    rotation_matrix = rotation_matrix_3d.from_euler(local_rotations)
+    local_normalized_coordinates= tf.matmul(
+        tf.expand_dims(local_rotations, -2),
+        tf.expand_dims(local_normalized_coordinates, -1))
+    local_normalized_coordinates = tf.squeeze(local_normalized_coordinates, -1)
+
+    local_normalized_coordinates = local_normalized_coordinates + (
+        tf.math.reduce_sum(local_predicted_coordinates, axis=-2, keepdims=True) /
+        tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+
+    return self._global_coordinates_fn(local_normalized_coordinates)
+
+  def trainable_weights(self):
+    return self._local_rotation_model.trainable_weights
+
+  def save(self, location):
+    _SaveModel(self._local_rotation_model, location)
+
+  def save_weights(self, location):
+    _SaveWeights(self._local_rotation_model, location)
+
+
 LossInformation = collections.namedtuple(
-    'LossInformation', ['loss', 'loss_beta_1', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae'])
+    'LossInformation', ['loss', 'loss_beta_1', 'local_logpx_z', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae', 'local_diff_mae'])
 class VariationalModel(object):
-  def __init__(self, conditioner, decoder, encoder, rotation_model=None):
+  def __init__(self, conditioner, decoder, encoder, rotation_model=None, local_transformation_model=None):
     self._conditioner = conditioner
     self._decoder = decoder
     self._encoder = encoder
     self._rotation_model = rotation_model
+    self._local_transformation_model = local_transformation_model
 
   def _log_normal_pdf(self, sample, mean, logvar):
     log2pi = tf.math.log(2. * np.pi)
@@ -158,6 +205,22 @@ class VariationalModel(object):
     # See https://www.tensorflow.org/tutorials/generative/cvae#define_the_loss_function_and_the_optimizer
     # for definition of the loss functions.
     normalized_coordinates = training_data['normalized_coordinates']
+    local_logpx_z = 0
+    local_diff_mae = 0
+
+    if self._local_transformation_model is not None:
+      locally_adjusted_normalized_coordinates = (
+          self._local_transformation_model.local_transform(
+            normalized_coordinates, x.mean(), atom_mask))
+      local_logpx_z = tf.reduce_sum(
+          tf.math.multiply(
+            x.log_prob(normalized_coordinates),
+            atom_mask), axis=[-1, -2])
+      local_diff_mae = tf.math.reduce_sum(
+            tf.math.multiply(
+                tf.math.abs(locally_adjusted_normalized_coordinates - x.mean()),
+                tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
+
     if self._rotation_model is not None:
       rot_matrix = self._get_rotation_matrix(
           normalized_coordinates, x.mean())
@@ -177,17 +240,22 @@ class VariationalModel(object):
                 tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
 
     return LossInformation(
-        loss=-tf.reduce_mean(logpx_z + beta*(logpz - logqz_x)),
+        loss=-tf.reduce_mean(logpx_z + local_logpx_z + beta*(logpz - logqz_x)),
         loss_beta_1 = -tf.reduce_mean(logpx_z + logpz - logqz_x),
+        local_logpx_z=tf.reduce_mean(local_logpx_z),
         logpx_z=tf.reduce_mean(logpx_z),
         logpz=tf.reduce_mean(logpz),
         logqz_x=tf.reduce_mean(logqz_x),
-        diff_mae=diff_mae)
+        diff_mae=diff_mae,
+        local_diff_mae=local_diff_mae)
 
   def save(self, location):
     self._conditioner.save(location + '/conditioner')
     self._decoder.save(location + '/decoder')
     self._encoder.save(location + '/encoder')
+    if self._local_transformation_model is not None:
+      self._local_rotation_model.save(location + '/local_rotation_model')
+
     if self._rotation_model:
       _SaveModel(self._rotation_model, location + '/rotation_model')
   
@@ -195,9 +263,12 @@ class VariationalModel(object):
     self._conditioner.save_weights(location + '/conditioner')
     self._decoder.save_weights(location + '/decoder')
     self._encoder.save_weights(location + '/encoder')
+    if self._local_transformation_model is not None:
+      self._local_rotation_model.save_weights(location + '/local_rotation_model')
     if self._rotation_model:
       _SaveWeights(self._rotation_model, location + '/rotation_model')
 
+  # TODO: Add support to add  local model.
   def load_model(full_model_location, model_weight_location, should_load_rotation_model=False):
     return VariationalModel(
         Conditioner(LoadModel(full_model_location, model_weight_location, '/conditioner')),
