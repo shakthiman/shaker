@@ -126,7 +126,7 @@ class LocalTransformationModel(object):
       tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
     rotation_matrix = rotation_matrix_3d.from_euler(local_rotations)
     local_normalized_coordinates= tf.matmul(
-        tf.expand_dims(rotation_matrix, -2),
+        tf.expand_dims(rotation_matrix, -3),
         tf.expand_dims(local_normalized_coordinates, -1))
     local_normalized_coordinates = tf.squeeze(local_normalized_coordinates, -1)
 
