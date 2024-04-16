@@ -123,7 +123,7 @@ class LocalTransformationModel(object):
     local_normalized_coordinates = local_normalized_coordinates - (
       tf.math.reduce_sum(
         local_normalized_coordinates, axis=-2,keepdims=True) /
-      tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+      tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
     rotation_matrix = rotation_matrix_3d.from_euler(local_rotations)
     local_normalized_coordinates= tf.matmul(
         tf.expand_dims(local_rotations, -2),
@@ -132,7 +132,7 @@ class LocalTransformationModel(object):
 
     local_normalized_coordinates = local_normalized_coordinates + (
         tf.math.reduce_sum(local_predicted_coordinates, axis=-2, keepdims=True) /
-        tf.math.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+        tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
 
     return self._global_coordinates_fn(local_normalized_coordinates)
 
