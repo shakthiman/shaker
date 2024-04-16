@@ -458,4 +458,4 @@ def MODEL_FOR_TRAINING(vocab, config):
       model.Decoder(DecoderModel()),
       model.Encoder(EncoderModel()),
       RotationModel(),
-      LocalTransformationModel(LocalRotationModel(), LocalCoordinates, LocalMask, GlobalCoordinates) if config.get('should_do_local_transform', False) else None)
+      model.LocalTransformationModel(LocalRotationModel(), LocalCoordinates, LocalMask, GlobalCoordinates) if config.get('should_do_local_transform', False) else None)
