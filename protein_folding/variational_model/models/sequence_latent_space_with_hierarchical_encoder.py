@@ -410,7 +410,7 @@ def LocalCoordinates(normalized_coordinates):
 def LocalMask(atom_mask):
   atom_mask = tf.ensure_shape(
       atom_mask, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE])
-  return tf.reshape(normalized_coordinates,
+  return tf.reshape(atom_mask,
                     [_BATCH_SIZE,
                      _NUM_PEPTIDES,
                      _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE,
