@@ -29,7 +29,10 @@ def _TrainStep(train_iterator, cpu_step):
     sources = (
         ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
         ['decoder'] * len(MODEL._decoder.trainable_weights()) +
-        ['encoder'] * len(MODEL._encoder.trainable_weights()))
+        ['encoder'] * len(MODEL._encoder.trainable_weights()) +
+        ['rotation_model'] * len(MODEL._rotation_model.trainable_weights) +
+        ['local_transformation_model'] * len(
+            MODEL._local_transformation_model.trainable_weights()))
     grad_norm_by_source = {}
     for s,g in zip(sources, grads):
       if s in grad_norm_by_source:

@@ -167,7 +167,9 @@ class VariationalModel(object):
         self._conditioner.trainable_weights() +
         self._decoder.trainable_weights() +
         self._encoder.trainable_weights() +
-        (self._rotation_model.trainable_weights if self._rotation_model is not None else []))
+        (self._rotation_model.trainable_weights if self._rotation_model is not None else []) +
+        (self._local_transformation_model.trainable_weights()
+         if self._local_transformation_model is not None else []))
 
   def decode(self, encoder_embedding, training_data, training):
     atom_mask = _XMask(training_data['normalized_coordinates'])
