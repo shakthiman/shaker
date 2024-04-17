@@ -426,13 +426,13 @@ def LocalRotationModel():
       shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, _LOCAL_ATOMS_SIZE, 3],
       name='local_predicted_coordinates')
 
-  local_normalized_coordinates_mean_removed = local_normalized_coordinates - (
+  local_normalized_coordinates_mean_removed = local_normalized_coordinates - tf.math.divide_no_nan(
       tf.math.reduce_sum(
-        local_normalized_coordinates, axis=-2,keepdims=True) /
+        local_normalized_coordinates, axis=-2,keepdims=True),
       tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
-  local_predicted_coordinates_mean_removed = local_predicted_coordinates - (
+  local_predicted_coordinates_mean_removed = local_predicted_coordinates - tf.math.divide_no_nan(
       tf.math.reduce_sum(
-        local_predicted_coordinates, axis=-2,keepdims=True) /
+        local_predicted_coordinates, axis=-2,keepdims=True),
       tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
 
 
@@ -442,8 +442,8 @@ def LocalRotationModel():
 
   prediction = tf.keras.layers.Dense(3)(tf.keras.layers.Dense(100, 'gelu')(
       tf.keras.layers.Dense(100, 'gelu')(input_features)))
-  prediction = tf.math.reduce_sum(prediction, -2) / tf.math.reduce_sum(
-      local_atom_mask, axis=-1, keepdims=True)
+  prediction = tf.math.divide_no_nan(tf.math.reduce_sum(prediction, -2), tf.math.reduce_sum(
+      local_atom_mask, axis=-1, keepdims=True))
 
   prediction = tf.ensure_shape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
   return tf.keras.Model(inputs=[local_normalized_coordinates, local_atom_mask, local_predicted_coordinates],
