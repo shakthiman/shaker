@@ -256,7 +256,7 @@ class VariationalModel(object):
     self._decoder.save(location + '/decoder')
     self._encoder.save(location + '/encoder')
     if self._local_transformation_model is not None:
-      self._local_rotation_model.save(location + '/local_rotation_model')
+      self._local_transformation_model.save(location + '/local_transformation_model')
 
     if self._rotation_model:
       _SaveModel(self._rotation_model, location + '/rotation_model')
@@ -266,7 +266,7 @@ class VariationalModel(object):
     self._decoder.save_weights(location + '/decoder')
     self._encoder.save_weights(location + '/encoder')
     if self._local_transformation_model is not None:
-      self._local_rotation_model.save_weights(location + '/local_rotation_model')
+      self._local_transformation_model.save_weights(location + '/local_transformation_model')
     if self._rotation_model:
       _SaveWeights(self._rotation_model, location + '/rotation_model')
 
