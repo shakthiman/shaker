@@ -48,8 +48,8 @@ def main ():
     model=variational_model,
     optimizer=optimizer,
     save_frequency=1000,
-    write_target='gs://variational_shaker_models/assembly_based_model_prod_churnam_fast',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_churnam_fast',
+    write_target='gs://variational_shaker_models/assembly_based_model_prod_churnam_fast2',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_churnam_fast2',
     checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_churnam_fast',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step))
