@@ -96,7 +96,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
     print('Wall Time Start: ', datetime.datetime.now())
     train_step_information = _TrainStep(train_iterator, tf.constant(cpu_step))
     train_step_information = STRATEGY.experimental_local_results(train_step_information)
-    print(train_step_information)
+    print(cpu_step)
     print('Wall Time Finish: ', datetime.datetime.now())
     if cpu_step % 100 == 0:
       with summary_writer.as_default():
