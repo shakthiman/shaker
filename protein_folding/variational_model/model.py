@@ -129,13 +129,13 @@ class LocalTransformationModel(object):
     return self._global_coordinates_fn(local_normalized_coordinates)
 
   def trainable_weights(self):
-    return self._local_rotation_model.trainable_weights
+    return []
 
   def save(self, location):
-    _SaveModel(self._local_rotation_model, location)
+    pass
 
   def save_weights(self, location):
-    _SaveWeights(self._local_rotation_model, location)
+    pass
 
 
 LossInformation = collections.namedtuple(
