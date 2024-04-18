@@ -101,7 +101,7 @@ class Encoder(object):
     _SaveWeights(self._model, location)
 
 class LocalTransformationModel(object):
-  def __init__(self, local_rotation_model, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
+  def __init__(self, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
     self._local_rotation_model = local_rotation_model
     self._local_coordinates_fn = local_coordinates_fn
     self._local_mask_fn = local_mask_fn
@@ -124,22 +124,6 @@ class LocalTransformationModel(object):
         tf.math.reduce_sum(
           local_predicted_coordinates*tf.expand_dims(local_atom_mask, -1), axis=-2, keepdims=True),
         tf.expand_dims(num_local_atoms, -1))
-
-    local_predicted_coordinates_mean_removed = local_predicted_coordinates - local_predicted_coordinates_mean
-
-    local_rotations = self._local_rotation_model({
-      'local_normalized_coordinates_mean_removed': local_normalized_coordinates_mean_removed,
-      'local_atom_mask': local_atom_mask,
-      'num_local_atoms': num_local_atoms,
-      'local_predicted_coordinates_mean_removed': local_predicted_coordinates_mean_removed
-      })
-    local_rotations = tf.ensure_shape(local_rotations, [None, None, None, 3])
-
-    rotation_matrix = rotation_matrix_3d.from_euler(local_rotations)
-    local_normalized_coordinates_mean_removed = tf.matmul(
-        tf.expand_dims(rotation_matrix, -3),
-        tf.expand_dims(local_normalized_coordinates_mean_removed, -1))
-    local_normalized_coordinates_mean_removed = tf.squeeze(local_normalized_coordinates_mean_removed, -1)
 
     local_normalized_coordinates = local_normalized_coordinates_mean_removed + local_predicted_coordinates_mean
 
@@ -219,19 +203,6 @@ class VariationalModel(object):
     local_logpx_z = 0
     local_diff_mae = 0
 
-    if self._local_transformation_model is not None:
-      locally_adjusted_normalized_coordinates = (
-          self._local_transformation_model.local_transform(
-            normalized_coordinates, x.mean(), atom_mask))
-      local_logpx_z = tf.reduce_sum(
-          tf.math.multiply(
-            x.log_prob(normalized_coordinates),
-            atom_mask), axis=[-1, -2])
-      local_diff_mae = tf.math.reduce_sum(
-            tf.math.multiply(
-                tf.math.abs(locally_adjusted_normalized_coordinates - x.mean()),
-                tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
-
     if self._rotation_model is not None:
       rot_matrix = self._get_rotation_matrix(
           normalized_coordinates, x.mean())
@@ -239,6 +210,20 @@ class VariationalModel(object):
               tf.expand_dims(tf.expand_dims(rot_matrix, 1), 1),
               tf.expand_dims(normalized_coordinates, -1))
       normalized_coordinates = tf.squeeze(normalized_coordinates, axis=-1)
+
+    if self._local_transformation_model is not None:
+      locally_adjusted_normalized_coordinates = (
+          self._local_transformation_model.local_transform(
+            normalized_coordinates, x.mean(), atom_mask))
+      local_logpx_z = tf.reduce_sum(
+          tf.math.multiply(
+            x.log_prob(locally_adjusted_normalized_coordinates),
+            atom_mask), axis=[-1, -2])
+      local_diff_mae = tf.math.reduce_sum(
+            tf.math.multiply(
+                tf.math.abs(locally_adjusted_normalized_coordinates - x.mean()),
+                tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
+
     logpx_z = tf.reduce_sum(
             tf.math.multiply(
                 x.log_prob(normalized_coordinates),
