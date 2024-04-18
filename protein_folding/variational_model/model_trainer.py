@@ -68,8 +68,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         conditioner=MODEL._conditioner._model,
         decoder=MODEL._decoder._model,
         encoder=MODEL._encoder._model,
-        rotation_model=MODEL._rotation_model,
-        local_transformation_model=MODEL._local_transformation_model._local_rotation_model)
+        rotation_model=MODEL._rotation_model)
   manager = tf.train.CheckpointManager(ckpt, checkpoint_directory, max_to_keep=3)
   ckpt.restore(manager.latest_checkpoint)
   if manager.latest_checkpoint:
