@@ -438,7 +438,7 @@ def LocalRotationModel():
       prediction*tf.expand_dims(local_atom_mask, -1), -2), num_local_atoms)
 
   prediction = tf.ensure_shape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
-  return tf.keras.Model(inputs=[local_normalized_coordinates, local_atom_mask, local_predicted_coordinates],
+  return tf.keras.Model(inputs=[local_normalized_coordinates_mean_removed, local_atom_mask, num_local_atoms, local_predicted_coordinates_mean_removed],
                         outputs=prediction)
 
 def MODEL_FOR_TRAINING(vocab, config):
