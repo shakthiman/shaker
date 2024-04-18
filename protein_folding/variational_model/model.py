@@ -102,7 +102,6 @@ class Encoder(object):
 
 class LocalTransformationModel(object):
   def __init__(self, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
-    self._local_rotation_model = local_rotation_model
     self._local_coordinates_fn = local_coordinates_fn
     self._local_mask_fn = local_mask_fn
     self._global_coordinates_fn = global_coordinates_fn
