@@ -113,26 +113,35 @@ class LocalTransformationModel(object):
     local_atom_mask = self._local_mask_fn(atom_mask)
     local_predicted_coordinates = self._local_coordinates_fn(predicted_coordinates)
 
+    num_local_atoms = tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True)
+
+    local_normalized_coordinates_mean_removed = local_normalized_coordinates - tf.math.divide_no_nan(
+        tf.math.reduce_sum(
+          local_normalized_coordinates*tf.expand_dims(local_atom_mask, -1), axis=-2,keepdims=True),
+        tf.expand_dims(num_local_atoms, -1))
+
+    local_predicted_coordinates_mean = tf.math.divide_no_nan(
+        tf.math.reduce_sum(
+          local_predicted_coordinates*tf.expand_dims(local_atom_mask, -1), axis=-2, keepdims=True),
+        tf.expand_dims(num_local_atoms, -1))
+
+    local_predicted_coordinates_mean_removed = local_predicted_coordinates - local_predicted_coordinates_mean
+
     local_rotations = self._local_rotation_model({
-      'local_normalized_coordinates': local_normalized_coordinates,
+      'local_normalized_coordinates_mean_removed': local_normalized_coordinates_mean_removed,
       'local_atom_mask': local_atom_mask,
-      'local_predicted_coordinates': local_predicted_coordinates
+      'num_local_atoms': num_local_atoms,
+      'local_predicted_coordinates_mean_removed': local_predicted_coordinates_mean_removed
       })
     local_rotations = tf.ensure_shape(local_rotations, [None, None, None, 3])
 
-    local_normalized_coordinates = local_normalized_coordinates - tf.math.divide_no_nan(
-      tf.math.reduce_sum(
-        local_normalized_coordinates, axis=-2,keepdims=True),
-      tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
     rotation_matrix = rotation_matrix_3d.from_euler(local_rotations)
-    local_normalized_coordinates= tf.matmul(
+    local_normalized_coordinates_mean_removed = tf.matmul(
         tf.expand_dims(rotation_matrix, -3),
-        tf.expand_dims(local_normalized_coordinates, -1))
-    local_normalized_coordinates = tf.squeeze(local_normalized_coordinates, -1)
+        tf.expand_dims(local_normalized_coordinates_mean_removed, -1))
+    local_normalized_coordinates_mean_removed = tf.squeeze(local_normalized_coordinates_mean_removed, -1)
 
-    local_normalized_coordinates = local_normalized_coordinates + tf.math.divide_no_nan(
-        tf.math.reduce_sum(local_predicted_coordinates, axis=-2, keepdims=True),
-        tf.expand_dims(tf.math.reduce_sum(local_atom_mask, axis=-1, keepdims=True), -1))
+    local_normalized_coordinates = local_normalized_coordinates_mean_removed + local_predicted_coordinates_mean
 
     return self._global_coordinates_fn(local_normalized_coordinates)
 
