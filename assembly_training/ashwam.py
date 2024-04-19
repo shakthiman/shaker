@@ -31,7 +31,7 @@ def main ():
   with strategy.scope():
     variational_model = sequence_latent_space_with_hierarchical_encoder.MODEL_FOR_TRAINING(
         v, config)
-    optimizer = tf.keras.optimizers.Adam(clipnorm=100, global_clipnorm=5e6)
+    optimizer = tf.keras.optimizers.Adam(global_clipnorm=5e6)
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
                               blob_prefix='pdb_training_examples_mar_26/polypeptides',
