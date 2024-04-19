@@ -5,7 +5,7 @@ import functools
 import tensorflow as tf
 
 TrainStepInformation = collections.namedtuple(
-        'TrainStepInformation', ['loss_information', 'grad_norm', 'grad_norm_by_source'])
+        'TrainStepInformation', ['loss_information', 'grad_norm', 'grad_norm_by_source', 'max_grad_norm'])
 
 MODEL = None
 STRATEGY = None
@@ -26,6 +26,8 @@ def _TrainStep(train_iterator, cpu_step):
     OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
     grad_norm = functools.reduce(
         lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
+    max_grad_norm = functools.reduce(
+        lambda x,y: tf.math.max(x, tf.norm(y)), grads, 0.0)
     sources = (
         ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
         ['decoder'] * len(MODEL._decoder.trainable_weights()) +
@@ -43,7 +45,8 @@ def _TrainStep(train_iterator, cpu_step):
     return TrainStepInformation(
             loss_information=loss_information,
             grad_norm=grad_norm,
-            grad_norm_by_source=grad_norm_by_source)
+            grad_norm_by_source=grad_norm_by_source,
+            max_grad_norm=max_grad_norm)
   for i in tf.range(TRAIN_STEPS-1, dtype=tf.int64):
     STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + i)))
   return STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + TRAIN_STEPS - 1)))
@@ -108,6 +111,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         tf.summary.scalar('diff_mae', train_step_information[0].loss_information.diff_mae, step=cpu_step)
         tf.summary.scalar('local_diff_mae', train_step_information[0].loss_information.local_diff_mae, step=cpu_step)
         tf.summary.scalar('grad_norm', train_step_information[0].grad_norm, step=cpu_step)
+        tf.summary.scalar('max_grad_norm', train_step_information[0].max_grad_norm, step=cpu_step)
         for s, g in train_step_information[0].grad_norm_by_source.items():
           tf.summary.scalar('grad_norm_by_source_' + s, g, step=cpu_step)
     if cpu_step == 0:
