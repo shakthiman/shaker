@@ -27,7 +27,7 @@ def _TrainStep(train_iterator, cpu_step):
     grad_norm = functools.reduce(
         lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
     max_grad_norm = functools.reduce(
-        lambda x,y: tf.math.max(x, tf.norm(y)), grads, 0.0)
+        lambda x,y: tf.math.maximum(x, tf.norm(y)), grads, 0.0)
     sources = (
         ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
         ['decoder'] * len(MODEL._decoder.trainable_weights()) +
