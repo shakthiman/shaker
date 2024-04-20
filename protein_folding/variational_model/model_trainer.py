@@ -38,6 +38,7 @@ def _TrainStep(train_iterator, cpu_step):
           tf.math.abs(y))), grads, 0.0)
     sum_grad_size = functools.reduce(
         lambda x,y: tf.math.add(x, tf.size(y)), grads, 0)
+    sum_grad_size = tf.cast(sum_grad_size, tf.float32)
 
     mean_grad_value = sum_grad_value/sum_grad_size
     square_diff_grad_value = functools.reduce(
