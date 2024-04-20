@@ -48,9 +48,9 @@ def main ():
     model=variational_model,
     optimizer=optimizer,
     save_frequency=1000,
-    write_target='gs://variational_shaker_models/assembly_based_model_prod_ashwam_cut_norm',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_ashwam_cut_norm',
-    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_ashwam_cut_norm',
+    write_target='gs://variational_shaker_models/assembly_based_model_prod_ashwam_cut_value',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_ashwam_cut_value',
+    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_ashwam_cut_value',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step))
 
