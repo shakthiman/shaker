@@ -63,7 +63,7 @@ def main ():
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step),
     config={'grad_clip_value': 10},
-    cpu_step=92000)
+    start_cpu_step=92000)
 
 if __name__ == "__main__":
   main()
