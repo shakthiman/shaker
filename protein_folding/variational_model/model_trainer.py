@@ -79,7 +79,7 @@ def _TrainStep(train_iterator, cpu_step):
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
     tensorboard_target, checkpoint_directory, strategy, beta_fn=lambda cpu_step: 1,
-    config=dict()):
+    config=dict(), start_cpu_step=0):
   global MODEL
   global STRATEGY
   global OPTIMIZER
@@ -94,7 +94,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
 
   with STRATEGY.scope():
     ckpt = tf.train.Checkpoint(
-        ck_step=tf.Variable(0, dtype=tf.int64),
+        ck_step=tf.Variable(start_cpu_step, dtype=tf.int64),
         optimizer=OPTIMIZER,
         conditioner=MODEL._conditioner._model,
         decoder=MODEL._decoder._model,

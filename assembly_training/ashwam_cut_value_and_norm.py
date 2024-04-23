@@ -62,7 +62,8 @@ def main ():
     checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_ashwam_cut_value_and_norm',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step),
-    config={'grad_clip_value': 10})
+    config={'grad_clip_value': 10},
+    cpu_step=92000)
 
 if __name__ == "__main__":
   main()
