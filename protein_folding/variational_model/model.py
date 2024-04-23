@@ -264,10 +264,12 @@ class VariationalModel(object):
       _SaveWeights(self._rotation_model, location + '/rotation_model')
 
   # TODO: Add support to add  local model.
-  def load_model(full_model_location, model_weight_location, should_load_rotation_model=False):
+  def load_model(full_model_location, model_weight_location, local_transformation_model=None,
+                 should_load_rotation_model=False):
     return VariationalModel(
         Conditioner(LoadModel(full_model_location, model_weight_location, '/conditioner')),
         Decoder(LoadModel(full_model_location, model_weight_location, '/decoder')),
         Encoder(LoadModel(full_model_location, model_weight_location, '/encoder')),
         LoadModel(full_model_location, model_weight_location, '/rotation_model')
-        if should_load_rotation_model else None)
+        if should_load_rotation_model else None,
+        local_transformation_model)
