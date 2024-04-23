@@ -14,6 +14,7 @@ STRATEGY = None
 OPTIMIZER = None
 BETA_FN = None
 TRAIN_STEPS = 100
+CONFIG = None
 
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
@@ -25,6 +26,10 @@ def _TrainStep(train_iterator, cpu_step):
           beta=beta)
     trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss_information, trainable_weights)
+    if 'grad_clip_value' in CONFIG:
+      clip_value = CONFIG['grad_clip_value']
+      grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
+
     OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
     grad_norm = functools.reduce(
         lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
@@ -73,16 +78,19 @@ def _TrainStep(train_iterator, cpu_step):
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
-    tensorboard_target, checkpoint_directory, strategy, beta_fn=lambda cpu_step: 1):
+    tensorboard_target, checkpoint_directory, strategy, beta_fn=lambda cpu_step: 1,
+    config=dict()):
   global MODEL
   global STRATEGY
   global OPTIMIZER
   global BETA_FN
+  global CONFIG
 
   MODEL = model
   STRATEGY = strategy
   OPTIMIZER = optimizer
   BETA_FN = beta_fn
+  CONFIG = config
 
   with STRATEGY.scope():
     ckpt = tf.train.Checkpoint(
