@@ -18,7 +18,7 @@ CONFIG = None
 
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
-  gradient_accumulation_steps = config.get('gradient_accumulation_steps', 1)
+  gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
   def step_fun(training_data, cpu_step):
     trainable_weights = MODEL.trainable_weights()
     def _grad_fun(training_data, beta):
