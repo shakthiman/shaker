@@ -21,7 +21,7 @@ def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
   def step_fun(training_data, cpu_step):
     trainable_weights = MODEL.trainable_weights()
-    def _reporting_fun(loss_information,, grads):
+    def _reporting_fun(loss_information, grads):
       grad_norm = functools.reduce(
           lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
       max_grad_norm = functools.reduce(
