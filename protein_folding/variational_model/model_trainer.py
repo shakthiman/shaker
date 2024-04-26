@@ -34,6 +34,7 @@ def _TrainStep(train_iterator, cpu_step):
       return (loss_information, grads)
 
     loss_information, aggregate_grads = _grad_fun(training_data, BETA_FN(cpu_step))
+    aggregate_grads = [g for g in aggregate_grads]
     if gradient_accumulation_steps==1:
       OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
       return (loss_information, aggregate_grads)
