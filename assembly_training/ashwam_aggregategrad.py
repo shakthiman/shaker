@@ -32,7 +32,7 @@ def main ():
   with strategy.scope():
     variational_model = sequence_latent_space_with_hierarchical_encoder.MODEL_FOR_TRAINING(
         v, config)
-    optimizer = tf.keras.optimizers.Adam(clipnorm=5e5, amsgrad=True, gradient_accumulation_steps=500)
+    optimizer = tf.keras.optimizers.Adam(clipnorm=5e5, amsgrad=True)
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
                               blob_prefix='pdb_training_examples_mar_26/polypeptides',
@@ -62,7 +62,8 @@ def main ():
     checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_ashwam_aggregategrad',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step),
-    config={'grad_clip_value': 10},
+    config={'grad_clip_value': 10,
+            'gradient_accumulation_steps': 500},
     start_cpu_step=92000)
 
 if __name__ == "__main__":
