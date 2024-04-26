@@ -41,10 +41,10 @@ def _TrainStep(train_iterator, cpu_step):
     for i in tf.range(gradient_accumulation_steps - 2,
                       dtype=tf.int64):
       _, grads = _grad_fun(training_data, BETA_FN(cpu_step + 1 + i))
-      aggregate_grads = [tf.math.add(a, g) for a,g in zip(aggregate_grads, grads)]
+      aggregate_grads = [tf.sparse.add(a, g) for a,g in zip(aggregate_grads, grads)]
 
     loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
-    aggregate_grads = [tf.math.add(a, g) for a,g in zip(aggregate_grads)]
+    aggregate_grads = [tf.sparse.add(a, g) for a,g in zip(aggregate_grads)]
     OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
     return (loss_information, grads)
 
