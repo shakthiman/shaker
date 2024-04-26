@@ -21,6 +21,48 @@ def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
   def step_fun(training_data, cpu_step):
     trainable_weights = MODEL.trainable_weights()
+    def _reporting_fun(loss_information,, grads):
+      grad_norm = functools.reduce(
+          lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
+      max_grad_norm = functools.reduce(
+          lambda x,y: tf.math.maximum(x, tf.norm(y)), grads, 0.0)
+      max_grad_value = functools.reduce(
+          lambda x,y: tf.math.maximum(x, tf.math.reduce_max(
+            tf.math.abs(y))), grads, 0.0)
+      sum_grad_value = functools.reduce(
+          lambda x,y: tf.math.add(x, tf.math.reduce_sum(
+            tf.math.abs(y))), grads, 0.0)
+      sum_grad_size = functools.reduce(
+          lambda x,y: tf.math.add(x, tf.size(y)), grads, 0)
+      sum_grad_size = tf.cast(sum_grad_size, tf.float32)
+
+      mean_grad_value = sum_grad_value/sum_grad_size
+      square_diff_grad_value = functools.reduce(
+          lambda x,y: tf.math.add(x, tf.math.reduce_sum(
+            tf.math.square(tf.math.abs(y)-mean_grad_value))), grads, 0.0)
+      sources = (
+          ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
+          ['decoder'] * len(MODEL._decoder.trainable_weights()) +
+          ['encoder'] * len(MODEL._encoder.trainable_weights()) +
+          ['rotation_model'] * len(MODEL._rotation_model.trainable_weights) +
+          ['local_transformation_model'] * len(
+            MODEL._local_transformation_model.trainable_weights()))
+      grad_norm_by_source = {}
+      for s,g in zip(sources, grads):
+        if s in grad_norm_by_source:
+          grad_norm_by_source[s] = tf.math.add(tf.norm(g), grad_norm_by_source[s])
+        else:
+          grad_norm_by_source[s] = tf.norm(g)
+      
+      return TrainStepInformation(
+          loss_information=loss_information,
+          grad_norm=grad_norm,
+          grad_norm_by_source=grad_norm_by_source,
+          max_grad_norm=max_grad_norm,
+          max_grad_value=max_grad_value,
+          mean_grad_value=mean_grad_value,
+          variance_grad_value=square_diff_grad_value/sum_grad_size)
+
     def _grad_fun(training_data, beta):
       with tf.GradientTape() as tape:
         loss_information = MODEL.compute_loss(
@@ -34,10 +76,11 @@ def _TrainStep(train_iterator, cpu_step):
       return (loss_information, grads)
 
     loss_information, aggregate_grads = _grad_fun(training_data, BETA_FN(cpu_step))
-    aggregate_grads = [g for g in aggregate_grads]
+    # Add and divide to force an explicit shape.
+    aggregate_grads = [(g+g)/2 for g in aggregate_grads]
     if gradient_accumulation_steps==1:
       OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
-      return (loss_information, aggregate_grads)
+      return _reporting_fun(loss_information, aggregate_grads)
 
     for i in tf.range(gradient_accumulation_steps - 2,
                       dtype=tf.int64):
@@ -47,56 +90,17 @@ def _TrainStep(train_iterator, cpu_step):
     loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
     aggregate_grads = [tf.math.add(a, g) for a,g in zip(aggregate_grads, grads)]
     OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
-    return (loss_information, grads)
+    return _reporting_fun(loss_information, grads)
 
   FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
   for i in tf.range(FACTORED_STEPS-1, dtype=tf.int64):
     STRATEGY.run(step_fun, (next(train_iterator), cpu_step + i*gradient_accumulation_steps))
-  loss_information, grads = STRATEGY.run(step_fun, (next(train_iterator),
-                                                    cpu_step + (FACTORED_STEPS - 1)*gradient_accumulation_steps))
+  return STRATEGY.run(
+      step_fun,
+      (next(train_iterator),
+       cpu_step + (FACTORED_STEPS - 1)*gradient_accumulation_steps))
 
-    
-  grad_norm = functools.reduce(
-      lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
-  max_grad_norm = functools.reduce(
-      lambda x,y: tf.math.maximum(x, tf.norm(y)), grads, 0.0)
-  max_grad_value = functools.reduce(
-      lambda x,y: tf.math.maximum(x, tf.math.reduce_max(
-        tf.math.abs(y))), grads, 0.0)
-  sum_grad_value = functools.reduce(
-      lambda x,y: tf.math.add(x, tf.math.reduce_sum(
-        tf.math.abs(y))), grads, 0.0)
-  sum_grad_size = functools.reduce(
-      lambda x,y: tf.math.add(x, tf.size(y)), grads, 0)
-  sum_grad_size = tf.cast(sum_grad_size, tf.float32)
-
-  mean_grad_value = sum_grad_value/sum_grad_size
-  square_diff_grad_value = functools.reduce(
-      lambda x,y: tf.math.add(x, tf.math.reduce_sum(
-        tf.math.square(tf.math.abs(y)-mean_grad_value))), grads, 0.0)
-
-  sources = (
-      ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
-      ['decoder'] * len(MODEL._decoder.trainable_weights()) +
-      ['encoder'] * len(MODEL._encoder.trainable_weights()) +
-      ['rotation_model'] * len(MODEL._rotation_model.trainable_weights) +
-      ['local_transformation_model'] * len(
-          MODEL._local_transformation_model.trainable_weights()))
-  grad_norm_by_source = {}
-  for s,g in zip(sources, grads):
-    if s in grad_norm_by_source:
-      grad_norm_by_source[s] = tf.math.add(tf.norm(g), grad_norm_by_source[s])
-    else:
-      grad_norm_by_source[s] = tf.norm(g)
-
-  return TrainStepInformation(
-          loss_information=loss_information,
-          grad_norm=grad_norm,
-          grad_norm_by_source=grad_norm_by_source,
-          max_grad_norm=max_grad_norm,
-          max_grad_value=max_grad_value,
-          mean_grad_value=mean_grad_value,
-          variance_grad_value=square_diff_grad_value/sum_grad_size)
+  
 
 def Train(ds, shuffle_size, batch_size, prefetch_size,
     pdb_vocab, model, optimizer, save_frequency, write_target,
