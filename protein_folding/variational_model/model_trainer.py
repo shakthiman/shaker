@@ -73,6 +73,7 @@ def _TrainStep(train_iterator, cpu_step):
       if 'grad_clip_value' in CONFIG:
         clip_value = CONFIG['grad_clip_value']
         grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
+        grads = [tf.ensure_shape(g, v.shape) for g, v in zip(grads, trainable_weights)]
       return (loss_information, grads)
 
     aggregate_grads = [tf.zeros_like(v) for v in trainable_weights]
