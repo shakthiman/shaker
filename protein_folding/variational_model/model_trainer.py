@@ -77,7 +77,7 @@ def _TrainStep(train_iterator, cpu_step):
 
     loss_information, aggregate_grads = _grad_fun(training_data, BETA_FN(cpu_step))
     # Add and divide to force an explicit shape.
-    aggregate_grads = [(g+g)/2 for g in aggregate_grads]
+    aggregate_grads = [tf.math.add(g,g)/2 for g in aggregate_grads]
     if gradient_accumulation_steps==1:
       OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
       return _reporting_fun(loss_information, aggregate_grads)
