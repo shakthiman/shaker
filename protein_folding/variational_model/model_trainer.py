@@ -16,6 +16,11 @@ BETA_FN = None
 TRAIN_STEPS = 500
 CONFIG = None
 
+def ShapeList(x):
+  ps = x.get_shape().as_list()
+  ts = tf.shape(x)
+  return [ts[i] if ps[i] is None else ps[i] for i in range(len(ps))]
+
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
@@ -74,7 +79,7 @@ def _TrainStep(train_iterator, cpu_step):
       if 'grad_clip_value' in CONFIG:
         clip_value = CONFIG['grad_clip_value']
         grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
-        grads = [tf.ensure_shape(g, tf.shape(v)) for g, v in zip(grads, trainable_weights)]
+        grads = [tf.ensure_shape(g, ShapeList(v)) for g, v in zip(grads, trainable_weights)]
       return (loss_information, grads)
 
     loss_information, aggregate_grads = _grad_fun(training_data, BETA_FN(cpu_step))
@@ -87,10 +92,10 @@ def _TrainStep(train_iterator, cpu_step):
       if i==0:
         aggregate_grads=grads
       else:
-        aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
+        aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, ShapeList(a))) for a,g in zip(aggregate_grads, grads)]
 
     loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
-    aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
+    aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, ShapeList(a))) for a,g in zip(aggregate_grads, grads)]
     trainable_weights = MODEL.trainable_weights()
     OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
     return _reporting_fun(loss_information, grads)
