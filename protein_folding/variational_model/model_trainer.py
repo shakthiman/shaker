@@ -20,7 +20,6 @@ CONFIG = None
 def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
   def step_fun(training_data, cpu_step):
-    trainable_weights = MODEL.trainable_weights()
     def _reporting_fun(loss_information, grads):
       grad_norm = functools.reduce(
           lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
@@ -40,6 +39,7 @@ def _TrainStep(train_iterator, cpu_step):
       square_diff_grad_value = functools.reduce(
           lambda x,y: tf.math.add(x, tf.math.reduce_sum(
             tf.math.square(tf.math.abs(y)-mean_grad_value))), grads, 0.0)
+      trainable_weights = MODEL.trainable_weights()
       sources = (
           ['conditioner'] * len(MODEL._conditioner.trainable_weights()) +
           ['decoder'] * len(MODEL._decoder.trainable_weights()) +
@@ -69,21 +69,22 @@ def _TrainStep(train_iterator, cpu_step):
             training_data=training_data,
             training=True,
             beta=beta)
+      trainable_weights = MODEL.trainable_weights()
       grads = tape.gradient(loss_information, trainable_weights)
       if 'grad_clip_value' in CONFIG:
         clip_value = CONFIG['grad_clip_value']
         grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
-        grads = [tf.ensure_shape(g, v.shape) for g, v in zip(grads, trainable_weights)]
+        grads = [tf.ensure_shape(g, tf.shape(v)) for g, v in zip(grads, trainable_weights)]
       return (loss_information, grads)
 
     aggregate_grads = [tf.zeros_like(v) for v in trainable_weights]
     for i in tf.range(gradient_accumulation_steps - 1,
                       dtype=tf.int64):
       _, grads = _grad_fun(training_data, BETA_FN(cpu_step + i))
-      aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, a.shape)) for a,g in zip(aggregate_grads, grads)]
+      aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
 
     loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
-    aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, a.shape)) for a,g in zip(aggregate_grads, grads)]
+    aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
     OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
     return _reporting_fun(loss_information, grads)
 
