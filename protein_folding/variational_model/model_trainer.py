@@ -77,14 +77,17 @@ def _TrainStep(train_iterator, cpu_step):
         grads = [tf.ensure_shape(g, tf.shape(v)) for g, v in zip(grads, trainable_weights)]
       return (loss_information, grads)
 
-    aggregate_grads = [tf.zeros_like(v) for v in trainable_weights]
     for i in tf.range(gradient_accumulation_steps - 1,
                       dtype=tf.int64):
       _, grads = _grad_fun(training_data, BETA_FN(cpu_step + i))
-      aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
+      if i==0:
+        aggregate_grads=grads
+      else:
+        aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
 
     loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
     aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, tf.shape(a))) for a,g in zip(aggregate_grads, grads)]
+    trainable_weights = MODEL.trainable_weights()
     OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
     return _reporting_fun(loss_information, grads)
 
