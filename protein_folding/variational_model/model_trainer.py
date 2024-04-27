@@ -82,24 +82,15 @@ def _TrainStep(train_iterator, cpu_step):
         grads = [tf.ensure_shape(g, ShapeList(v)) for g, v in zip(grads, trainable_weights)]
       return (loss_information, grads)
 
-    loss_information, aggregate_grads = _grad_fun(training_data, BETA_FN(cpu_step))
+    all_grads = [_grad_fun(training_data, BETA_FN(cpu_step + i))
+                 for i in tf.range(gradient_accumulation_steps)]
+
+    concatenated_grads = [tf.concat([tf.expand_dims(x[1][i], -1) for x in all_grads], -1)
+                          for i in range(len(all_grads[0][1]))]
+    aggregated_grads = [tf.math.reduce_sum(c, -1) for c in concatenated_grads]
     trainable_weights = MODEL.trainable_weights()
-    if gradient_accumulation_steps==1:
-      OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
-      return _reporting_fun(loss_information, aggregate_grads)
-
-    for i in tf.range(gradient_accumulation_steps - 2,
-                      dtype=tf.int64):
-      _, grads = _grad_fun(training_data, BETA_FN(cpu_step + i + 1))
-      if i==0:
-        aggregate_grads=grads
-      else:
-        aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, ShapeList(a))) for a,g in zip(aggregate_grads, grads)]
-
-    loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
-    aggregate_grads = [tf.math.add(a, tf.ensure_shape(g, ShapeList(a))) for a,g in zip(aggregate_grads, grads)]
     OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
-    return _reporting_fun(loss_information, grads)
+    return _reporting_fun(all_grads[-1][0], all_grads[-1][1])
 
   FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
   for i in tf.range(FACTORED_STEPS-1, dtype=tf.int64):
