@@ -82,9 +82,9 @@ def _TrainStep(train_iterator, cpu_step):
     return _reporting_fun(loss_information, grads)
 
   for i in tf.range(TRAIN_STEPS-1, dtype=tf.int64):
-    STRATEGY.run(step_fun, (next(train_iterator), cpu_step + i))
+    STRATEGY.run(step_fun, (next(train_iterator), BETA_FN(cpu_step + i)))
   return STRATEGY.run(
-      step_fun, (next(train_iterator), cpu_step + TRAIN_STEPS - 1))
+      step_fun, (next(train_iterator), BETA_FN(cpu_step + TRAIN_STEPS - 1)))
 
   
 
