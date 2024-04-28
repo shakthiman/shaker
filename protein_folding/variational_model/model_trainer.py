@@ -89,8 +89,6 @@ def _TrainStep(train_iterator, cpu_step):
     if 'grad_clip_value' in CONFIG:
       clip_value = CONFIG['grad_clip_value']
       grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
-    return (loss_information, grads)
-
     OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
     return _reporting_fun(loss_information, grads)
 
