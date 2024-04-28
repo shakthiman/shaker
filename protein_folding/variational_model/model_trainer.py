@@ -76,7 +76,7 @@ def _TrainStep(train_iterator, cpu_step):
           beta=BETA_FN(cpu_step))
       loss = loss_information.loss
 
-      for i in tf.range(gradient_accumulation_steps-1):
+      for i in tf.range(gradient_accumulation_steps-1, dtype=tf.int64):
         loss = tf.math.add(
             loss, 
             MODEL.compute_loss(
