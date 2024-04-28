@@ -85,8 +85,9 @@ def _TrainStep(train_iterator, cpu_step):
       training_data['normalized_coordinates'] = tf.reshape(
           training_data['normalized_coordinates'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000, 3])
       training_data['betas'] = BETA_FN(cpu_step + tf.expand_dims(tf.range(gradient_accumulation_steps, dtype=tf.int64), -1))
-      losses = tf.map_fn(fn=lambda t: GetLossInformation(t, tf.squeeze(training_data['betas'], -1)).loss,
-                         elems=training_data)
+      losses = tf.map_fn(fn=lambda t: GetLossInformation(t, tf.squeeze(t['betas'], -1)).loss,
+                         elems=training_data,
+                         fn_output_signature=tf.float32)
       loss = tf.reduce_sum(losses)
       loss = loss / gradient_accumulation_steps
     trainable_weights = MODEL.trainable_weights()
