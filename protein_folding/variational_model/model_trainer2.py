@@ -96,6 +96,10 @@ def _TrainStep(train_iterator, cpu_step):
       clip_value = CONFIG['grad_clip_value']
       grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
     OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
+    training_data['residue_names'] = tf.unstack(training_data['residue_names'])[-1]
+    training_data['atom_names'] = tf.unstack(training_data['atom_names'])[-1]
+    training_data['normalized_coordinates'] = tf.unstack(training_data['normalized_coordinates'])[-1]
+    loss_information, grads = GetLossInformation(training_data, BETA_FN(cpu_step+gradient_accumulation_steps-1))
     return _reporting_fun(loss_information, grads)
 
   FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
