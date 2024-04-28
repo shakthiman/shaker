@@ -24,7 +24,7 @@ def ShapeList(x):
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
-  def step_fun(train_iterator, cpu_step):
+  def step_fun(training_datas, cpu_step):
     def _reporting_fun(loss_information, grads):
       grad_norm = functools.reduce(
           lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
@@ -68,9 +68,10 @@ def _TrainStep(train_iterator, cpu_step):
           mean_grad_value=mean_grad_value,
           variance_grad_value=square_diff_grad_value/sum_grad_size)
 
+    training_datas_iterator = iter(training_datas)
     with tf.GradientTape() as tape:
       loss_information = MODEL.compute_loss(
-          training_data=next(train_iterator),
+          training_data=next(training_datas_iterator),
           training=True,
           beta=beta)
       loss = loss_information.loss
@@ -79,7 +80,7 @@ def _TrainStep(train_iterator, cpu_step):
         loss = tf.math.add(
             loss, 
             MODEL.compute_loss(
-              training_data=next(train_iterator),
+              training_data=next(training_datas_iterator),
               training=True,
               beta=beta).loss)
       loss = loss / gradient_accumulation_steps
@@ -95,10 +96,11 @@ def _TrainStep(train_iterator, cpu_step):
 
   FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
   for i in tf.range(FACTORED_STEPS-1, dtype=tf.int64):
-    STRATEGY.run(step_fun, (train_iterator, cpu_step + i*gradient_accumulation_steps))
+    STRATEGY.run(step_fun, (
+        [next(train_iterator) for i in range(gradient_accumulation_steps)], cpu_step + i*gradient_accumulation_steps))
   return STRATEGY.run(
       step_fun,
-      (train_iterator,
+      ([next(train_iterator) for i in range(gradient_accumulation_steps)],
        cpu_step + (FACTORED_STEPS - 1)*gradient_accumulation_steps))
 
   
