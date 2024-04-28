@@ -85,7 +85,7 @@ def _TrainStep(train_iterator, cpu_step):
           training_data['normalized_coordinates'], [gradient_accumulation_steps, BATCH_SIZE, 4, 6000])
       training_data['betas'] = BETA_FN(cpu_step + tf.range(gradient_accumulation_steps))
       losses = tf.map_fn(fn=lambda t: GetLossInformation(t, training_data['betas']).loss,
-                         training_data)
+                         elems=training_data)
       loss = tf.reduce_sum(losses)
       loss = loss / gradient_accumulation_steps
     trainable_weights = MODEL.trainable_weights()
