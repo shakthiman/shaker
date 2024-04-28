@@ -83,7 +83,7 @@ def _TrainStep(train_iterator, cpu_step):
       training_data['atom_names'] = tf.reshape(
           training_data['atom_names'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000])
       training_data['normalized_coordinates'] = tf.reshape(
-          training_data['normalized_coordinates'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000])
+          training_data['normalized_coordinates'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000, 3])
       training_data['betas'] = BETA_FN(cpu_step + tf.range(gradient_accumulation_steps))
       losses = tf.map_fn(fn=lambda t: GetLossInformation(t, training_data['betas']).loss,
                          elems=training_data)
