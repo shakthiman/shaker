@@ -99,7 +99,7 @@ def _TrainStep(train_iterator, cpu_step):
     training_data['residue_names'] = tf.unstack(training_data['residue_names'])[-1]
     training_data['atom_names'] = tf.unstack(training_data['atom_names'])[-1]
     training_data['normalized_coordinates'] = tf.unstack(training_data['normalized_coordinates'])[-1]
-    loss_information, grads = GetLossInformation(training_data, BETA_FN(cpu_step+gradient_accumulation_steps-1))
+    loss_information = GetLossInformation(training_data, BETA_FN(cpu_step+gradient_accumulation_steps-1))
     return _reporting_fun(loss_information, grads)
 
   FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
