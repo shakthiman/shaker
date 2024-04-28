@@ -21,17 +21,9 @@ def ShapeList(x):
   ts = tf.shape(x)
   return [ts[i] if ps[i] is None else ps[i] for i in range(len(ps))]
 
-@tf.function
-def GetLossInformation(training_data, beta):
-  return MODEL.compute_loss(
-      training_data=training_data,
-      training=True,
-      beta=beta)
-
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
-  gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
-  def step_fun(training_datas, cpu_step):
+  def step_fun(training_data, beta):
     def _reporting_fun(loss_information, grads):
       grad_norm = functools.reduce(
           lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
@@ -77,14 +69,11 @@ def _TrainStep(train_iterator, cpu_step):
 
     training_datas_iterator = iter(training_datas)
     with tf.GradientTape() as tape:
-      loss_information = GetLossInformation(next(training_datas_iterator), beta=BETA_FN(cpu_step))
+      loss_information = MODEL.compute_loss(
+          training_data=training_data,
+          training=True,
+          beta=beta)
       loss = loss_information.loss
-
-      for i in tf.range(gradient_accumulation_steps-1, dtype=tf.int64):
-        loss = tf.math.add(
-            loss, 
-            GetLossInformation(next(training_datas_iterator), beta=BETA_FN(cpu_step + i + 1)).loss)
-      loss = loss / gradient_accumulation_steps
     trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss, trainable_weights)
     if 'grad_clip_value' in CONFIG:
@@ -93,14 +82,10 @@ def _TrainStep(train_iterator, cpu_step):
     OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
     return _reporting_fun(loss_information, grads)
 
-  FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
-  for i in tf.range(FACTORED_STEPS-1, dtype=tf.int64):
-    STRATEGY.run(step_fun, (
-        [next(train_iterator) for i in range(gradient_accumulation_steps)], cpu_step + i*gradient_accumulation_steps))
+  for i in tf.range(TRAIN_STEPS-1, dtype=tf.int64):
+    STRATEGY.run(step_fun, (next(train_iterator), cpu_step + i))
   return STRATEGY.run(
-      step_fun,
-      ([next(train_iterator) for i in range(gradient_accumulation_steps)],
-       cpu_step + (FACTORED_STEPS - 1)*gradient_accumulation_steps))
+      step_fun, (next(train_iterator), cpu_step + TRAIN_STEPS - 1))
 
   
 
