@@ -24,7 +24,7 @@ def ShapeList(x):
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
-  def step_fun(training_data, cpu_step):
+  def step_fun(train_iterator, cpu_step):
     def _reporting_fun(loss_information, grads):
       grad_norm = functools.reduce(
           lambda x,y: tf.math.add(x, tf.norm(y)), grads, 0.0)
@@ -68,47 +68,37 @@ def _TrainStep(train_iterator, cpu_step):
           mean_grad_value=mean_grad_value,
           variance_grad_value=square_diff_grad_value/sum_grad_size)
 
-    def _grad_fun(training_data, beta):
-      with tf.GradientTape() as tape:
-        loss_information = MODEL.compute_loss(
-            training_data=training_data,
-            training=True,
-            beta=beta)
-      trainable_weights = MODEL.trainable_weights()
-      grads = tape.gradient(loss_information, trainable_weights)
-      if 'grad_clip_value' in CONFIG:
-        clip_value = CONFIG['grad_clip_value']
-        grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
-        grads = [tf.ensure_shape(g, ShapeList(v)) for g, v in zip(grads, trainable_weights)]
-      return (loss_information, grads)
+    with tf.GradientTape() as tape:
+      loss_information = MODEL.compute_loss(
+          training_data=next(train_iterator),
+          training=True,
+          beta=beta)
+      loss = loss_information.loss
 
-    loss_information, aggregate_grads = _grad_fun(training_data, BETA_FN(cpu_step))
+      for i in tf.range(gradient_accumulation_steps-1):
+        loss = tf.math.add(
+            loss, 
+            MODEL.compute_loss(
+              training_data=next(train_iterator),
+              training=True,
+              beta=beta).loss)
+      loss = loss / gradient_accumulation_steps
     trainable_weights = MODEL.trainable_weights()
-    if gradient_accumulation_steps==1:
-      OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
-      return _reporting_fun(loss_information, aggregate_grads)
+    grads = tape.gradient(loss, trainable_weights)
+    if 'grad_clip_value' in CONFIG:
+      clip_value = CONFIG['grad_clip_value']
+      grads = [tf.clip_by_value(x, -1*clip_value, clip_value) for x in grads]
+    return (loss_information, grads)
 
-    for i in tf.range(gradient_accumulation_steps - 2,
-                      dtype=tf.int64):
-      _, grads = _grad_fun(training_data, BETA_FN(cpu_step + i + 1))
-      if i==0:
-        aggregate_grads=grads
-      else:
-        aggregate_grads = [tf.math.reduce_sum(
-          tf.concat([tf.expand_dims(a, -1), tf.expand_dims(g, -1)], -1), axis=-1) for a,g in zip(aggregate_grads, grads)]
-
-    loss_information, grads = _grad_fun(training_data, BETA_FN(cpu_step + gradient_accumulation_steps - 1))
-    aggregate_grads = [tf.math.reduce_sum(
-      tf.concat([tf.expand_dims(a, -1), tf.expand_dims(g, -1)], -1), axis=-1) for a,g in zip(aggregate_grads, grads)]
-    OPTIMIZER.apply_gradients(zip(aggregate_grads, trainable_weights))
+    OPTIMIZER.apply_gradients(zip(grads, trainable_weights))
     return _reporting_fun(loss_information, grads)
 
   FACTORED_STEPS = TRAIN_STEPS // gradient_accumulation_steps
   for i in tf.range(FACTORED_STEPS-1, dtype=tf.int64):
-    STRATEGY.run(step_fun, (next(train_iterator), cpu_step + i*gradient_accumulation_steps))
+    STRATEGY.run(step_fun, (train_iterator, cpu_step + i*gradient_accumulation_steps))
   return STRATEGY.run(
       step_fun,
-      (next(train_iterator),
+      (train_iterator,
        cpu_step + (FACTORED_STEPS - 1)*gradient_accumulation_steps))
 
   
