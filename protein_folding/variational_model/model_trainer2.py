@@ -16,6 +16,7 @@ BETA_FN = None
 TRAIN_STEPS = 500
 CONFIG = None
 BATCH_SIZE = None
+NUM_REPLICAS = None
 
 def ShapeList(x):
   ps = x.get_shape().as_list()
@@ -78,11 +79,11 @@ def _TrainStep(train_iterator, cpu_step):
 
     with tf.GradientTape() as tape:
       training_data['residue_names'] = tf.reshape(
-          training_data['residue_names'], [gradient_accumulation_steps, BATCH_SIZE, 4, 6000])
+          training_data['residue_names'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000])
       training_data['atom_names'] = tf.reshape(
-          training_data['atom_names'], [gradient_accumulation_steps, BATCH_SIZE, 4, 6000])
+          training_data['atom_names'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000])
       training_data['normalized_coordinates'] = tf.reshape(
-          training_data['normalized_coordinates'], [gradient_accumulation_steps, BATCH_SIZE, 4, 6000])
+          training_data['normalized_coordinates'], [gradient_accumulation_steps, BATCH_SIZE//NUM_REPLICAS, 4, 6000])
       training_data['betas'] = BETA_FN(cpu_step + tf.range(gradient_accumulation_steps))
       losses = tf.map_fn(fn=lambda t: GetLossInformation(t, training_data['betas']).loss,
                          elems=training_data)
@@ -116,6 +117,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   global BETA_FN
   global CONFIG
   global BATCH_SIZE
+  global NUM_REPLICAS
 
   MODEL = model
   STRATEGY = strategy
@@ -124,6 +126,7 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   CONFIG = config
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
   BATCH_SIZE = batch_size
+  NUM_REPLICAS = STRATEGY.num_replicas_in_sync
 
   with STRATEGY.scope():
     ckpt = tf.train.Checkpoint(
