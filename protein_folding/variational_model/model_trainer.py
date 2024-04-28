@@ -67,7 +67,6 @@ def _TrainStep(train_iterator, cpu_step):
           mean_grad_value=mean_grad_value,
           variance_grad_value=square_diff_grad_value/sum_grad_size)
 
-    training_datas_iterator = iter(training_datas)
     with tf.GradientTape() as tape:
       loss_information = MODEL.compute_loss(
           training_data=training_data,
