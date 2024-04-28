@@ -21,6 +21,13 @@ def ShapeList(x):
   ts = tf.shape(x)
   return [ts[i] if ps[i] is None else ps[i] for i in range(len(ps))]
 
+@tf.function
+def GetLossInformation(training_data, beta):
+  return MODEL.compute_loss(
+      training_data=training_data,
+      training=True,
+      beta=beta)
+
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
   gradient_accumulation_steps = CONFIG.get('gradient_accumulation_steps', 1)
@@ -70,19 +77,13 @@ def _TrainStep(train_iterator, cpu_step):
 
     training_datas_iterator = iter(training_datas)
     with tf.GradientTape() as tape:
-      loss_information = MODEL.compute_loss(
-          training_data=next(training_datas_iterator),
-          training=True,
-          beta=BETA_FN(cpu_step))
+      loss_information = GetLossInformation(next(training_datas_iterator), beta=BETA_FN(cpu_step))
       loss = loss_information.loss
 
       for i in tf.range(gradient_accumulation_steps-1, dtype=tf.int64):
         loss = tf.math.add(
             loss, 
-            MODEL.compute_loss(
-              training_data=next(training_datas_iterator),
-              training=True,
-              beta=BETA_FN(cpu_step+i)).loss)
+            GetLossInformation(next(training_datas_iterator), beta=BETA_FN(cpu_step + i + 1)).loss)
       loss = loss / gradient_accumulation_steps
     trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss, trainable_weights)
