@@ -73,7 +73,7 @@ def _TrainStep(train_iterator, cpu_step):
       loss_information = MODEL.compute_loss(
           training_data=next(training_datas_iterator),
           training=True,
-          beta=beta)
+          beta=BETA_FN(cpu_step))
       loss = loss_information.loss
 
       for i in tf.range(gradient_accumulation_steps-1):
@@ -82,7 +82,7 @@ def _TrainStep(train_iterator, cpu_step):
             MODEL.compute_loss(
               training_data=next(training_datas_iterator),
               training=True,
-              beta=beta).loss)
+              beta=BETA_FN(cpu_step+i)).loss)
       loss = loss / gradient_accumulation_steps
     trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss, trainable_weights)
