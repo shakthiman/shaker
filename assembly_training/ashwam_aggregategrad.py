@@ -30,8 +30,14 @@ def main ():
   config = {'scale_coordinates': False, 'should_do_local_transform': True}
 
   with strategy.scope():
-    variational_model = sequence_latent_space_with_hierarchical_encoder.MODEL_FOR_TRAINING(
-        v, config)
+    variational_model = model.VariationalModel.load_model(
+        'gs://variational_shaker_models/assembly_based_model_prod_ashwam_cut_value/version_0',
+        'gs://variational_shaker_models/assembly_based_model_prod_ashwam_cut_value2/version_92000',
+        local_transformation_model=model.LocalTransformationModel(
+          sequence_latent_space_with_hierarchical_encoder.LocalCoordinates,
+          sequence_latent_space_with_hierarchical_encoder.LocalMask,
+          sequence_latent_space_with_hierarchical_encoder.GlobalCoordinates),
+        should_load_rotation_model=True)
     optimizer = tf.keras.optimizers.Adam(clipnorm=5e5, amsgrad=True, gradient_accumulation_steps=500)
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
@@ -40,14 +46,7 @@ def main ():
                               cluster_shuffle_size=1000,
                               cluster_cycle_length=1000)
   print('Num Replicas: ', strategy.num_replicas_in_sync)
-  model.VariationalModel.load_model(
-    'gs://variational_shaker_models/assembly_based_model_prod_ashwam_cut_value/version_0',
-    'gs://variational_shaker_models/assembly_based_model_prod_ashwam_cut_value2/version_92000',
-    local_transformation_model=model.LocalTransformationModel(
-        sequence_latent_space_with_hierarchical_encoder.LocalCoordinates,
-        sequence_latent_space_with_hierarchical_encoder.LocalMask,
-        sequence_latent_space_with_hierarchical_encoder.GlobalCoordinates),
-    should_load_rotation_model=True)
+  
   model_trainer.Train(
     ds=ds,
     shuffle_size=10000,
