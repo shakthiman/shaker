@@ -13,13 +13,8 @@ MODEL = None
 STRATEGY = None
 OPTIMIZER = None
 BETA_FN = None
-TRAIN_STEPS = 500
+TRAIN_STEPS = 100
 CONFIG = None
-
-def ShapeList(x):
-  ps = x.get_shape().as_list()
-  ts = tf.shape(x)
-  return [ts[i] if ps[i] is None else ps[i] for i in range(len(ps))]
 
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
