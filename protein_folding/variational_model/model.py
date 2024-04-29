@@ -2,7 +2,6 @@ import collections
 
 import tensorflow as tf
 import tensorflow_probability as tfp
-import tf_keras
 
 import numpy as np
 
@@ -24,7 +23,7 @@ def _XMask(x):
                 tf.math.greater(tf.math.abs(x), 1e-6), axis=[-1]), tf.float32)
 
 def LoadModel(full_model_location, model_weight_location, suffix):
-  model = tf_keras.models.load_model(full_model_location + suffix)
+  model = tf.keras.models.load_model(full_model_location + suffix)
   model.load_weights(model_weight_location + suffix)
   return model
 
