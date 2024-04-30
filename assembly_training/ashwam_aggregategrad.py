@@ -38,7 +38,7 @@ def main ():
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
                               blob_prefix='pdb_training_examples_mar_26/polypeptides',
-                              num_parallel_calls=4,
+                              num_parallel_calls=None,
                               cluster_shuffle_size=1000,
                               cluster_cycle_length=1000)
   print('Num Replicas: ', strategy.num_replicas_in_sync)
