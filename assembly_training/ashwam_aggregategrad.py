@@ -47,7 +47,7 @@ def main ():
     ds=ds,
     shuffle_size=10000,
     batch_size=2*strategy.num_replicas_in_sync,
-    prefetch_size=10,
+    prefetch_size=150,
     pdb_vocab=pdb_vocab.PDBVocab(summary_blob),
     model=variational_model,
     optimizer=optimizer,
