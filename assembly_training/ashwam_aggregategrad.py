@@ -38,7 +38,7 @@ def main ():
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
                               blob_prefix='pdb_training_examples_mar_26/polypeptides',
-                              num_parallel_calls=None,
+                              num_parallel_calls=4,
                               cluster_shuffle_size=1000,
                               cluster_cycle_length=1000)
   print('Num Replicas: ', strategy.num_replicas_in_sync)
@@ -52,9 +52,9 @@ def main ():
     model=variational_model,
     optimizer=optimizer,
     save_frequency=1000,
-    write_target='gs://variational_shaker_models/assembly_based_model_prod_ashwam_aggregategrad',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_ashwam_aggregategrad',
-    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_ashwam_aggregategrad',
+    write_target='gs://variational_shaker_models/assembly_based_model_prod_ashwam_aggregategrad_pf',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_ashwam_aggregategrad_pf',
+    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_ashwam_aggregategrad_pf',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step),
     config={'grad_clip_value': 10},
