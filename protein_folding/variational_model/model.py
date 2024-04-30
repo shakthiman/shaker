@@ -45,6 +45,9 @@ class Conditioner(object):
   def save_weights(self, location):
     _SaveWeights(self._model, location)
 
+  def load_weights(self, location):
+    self._model.load_weights(location)
+
 class Decoder(object):
   def  __init__(self, model):
     self._model = model
@@ -65,6 +68,9 @@ class Decoder(object):
 
   def save_weights(self, location):
     _SaveWeights(self._model, location)
+
+  def load_weights(self, location):
+    self._model.load_weights(location)
 
 class Encoder(object):
   def __init__(self, model):
@@ -99,6 +105,9 @@ class Encoder(object):
 
   def save_weights(self, location):
     _SaveWeights(self._model, location)
+
+  def load_weights(self, location):
+    self._model.load_weights(location)
 
 class LocalTransformationModel(object):
   def __init__(self, local_coordinates_fn, local_mask_fn, global_coordinates_fn):
@@ -135,6 +144,9 @@ class LocalTransformationModel(object):
     pass
 
   def save_weights(self, location):
+    pass
+
+  def load_weights(self, location):
     pass
 
 
@@ -273,3 +285,11 @@ class VariationalModel(object):
         LoadModel(full_model_location, model_weight_location, '/rotation_model')
         if should_load_rotation_model else None,
         local_transformation_model)
+
+  def load_weights(self, model_weight_location):
+    self._conditioner.load_weights(model_weight_location + '/conditioner')
+    self._decoder.load_weights(model_weight_location + '/decoder')
+    self._encoder.load_weights(model_weight_location + '/encoder')
+    if self._rotation_model:
+      self._rotation_model.load_weights(model_weight_location + '/encoder')
+    self._local_transformation_model.load_weights(model_weight_location+'/local_transformation_model')
