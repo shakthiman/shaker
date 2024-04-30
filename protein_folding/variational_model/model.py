@@ -292,5 +292,5 @@ class VariationalModel(object):
     self._decoder.load_weights(model_weight_location + '/decoder')
     self._encoder.load_weights(model_weight_location + '/encoder')
     if self._rotation_model:
-      self._rotation_model.load_weights(model_weight_location + '/encoder')
+      self._rotation_model.load_weights(model_weight_location + '/rotation_model')
     self._local_transformation_model.load_weights(model_weight_location+'/local_transformation_model')
