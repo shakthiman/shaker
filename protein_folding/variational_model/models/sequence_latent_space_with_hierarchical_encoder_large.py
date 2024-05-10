@@ -91,7 +91,7 @@ def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, in
   global_self_attention = TransposeAndAttend(
       CustomSelfAttention(num_heads, key_dim), refactored_x,
       refactored_mask, [0, 2, 1, 3])
-  return tf_keras.layers.LayerNormalization(name='layer-normalization-1-'+str(random.randint(0, 10000)),
+  return tf_keras.layers.LayerNormalization(name='layer-normalization-1-'+str(random.randint(0, 1000000)),
                                             axis=[1,2])(
       tf_keras.layers.Add()([
         inputs,
@@ -106,7 +106,7 @@ def FeedForwardLayer(num_layers, ideal_sequence_size, output_size, inputs):
   t = tf.ensure_shape(t, [_BATCH_SIZE, ideal_sequence_size, output_size])
   added_val = tf_keras.layers.Add()([inputs, t])
   added_val = tf.ensure_shape(added_val, [_BATCH_SIZE, ideal_sequence_size, output_size])
-  return tf_keras.layers.LayerNormalization(name='layer-normalization-2-'+str(random.randint(0, 10000)),
+  return tf_keras.layers.LayerNormalization(name='layer-normalization-2-'+str(random.randint(0, 1000000)),
                                             axis=[1,2])(
       added_val)
 
