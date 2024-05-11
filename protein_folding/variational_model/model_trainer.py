@@ -102,7 +102,6 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   with STRATEGY.scope():
     ckpt = tf.train.Checkpoint(
         ck_step=tf.Variable(start_cpu_step, dtype=tf.int64),
-        optimizer=OPTIMIZER,
         conditioner=MODEL._conditioner._model,
         decoder=MODEL._decoder._model,
         encoder=MODEL._encoder._model,
