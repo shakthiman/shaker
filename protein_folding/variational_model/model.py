@@ -1,14 +1,11 @@
 import collections
 
 import tensorflow as tf
-import tensorflow_probability as tfp
 import tf_keras
 
 import numpy as np
 
 from tensorflow_graphics.geometry.transformation import rotation_matrix_3d
-
-tfd = tfp.distributions
 
 def _SaveModel(model, location):
   model.save(location, overwrite=True, save_format='tf',
@@ -49,6 +46,21 @@ class Conditioner(object):
   def load_weights(self, location):
     self._model.load_weights(location)
 
+class Distribution(object):
+  def __init__(self, loc, scale_diag):
+    self._loc = loc
+    self._scale_diag = scale_diag
+
+  def mean():
+    return self._loc
+
+  def log_prob(x):
+    log2pi = tf.math.log(2. * np.pi)
+    return tf.reduce_sum(
+        -0.5 * (((self._loc - x) / self._scale_diag)**2.)
+        - 0.5 * log2pi
+        - tf.math.log(self._scale_diag), axis=-1)
+
 class Decoder(object):
   def  __init__(self, model):
     self._model = model
@@ -58,7 +70,7 @@ class Decoder(object):
       'z': z,
       'atom_mask': atom_mask,
       'cond': cond}, training=training)
-    return tfd.MultivariateNormalDiag(
+    return Distribution(
         loc=outputs[0], scale_diag=outputs[1])
 
   def trainable_weights(self):
