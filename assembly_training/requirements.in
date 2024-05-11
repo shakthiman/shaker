@@ -2,6 +2,6 @@ wheel
 apache-beam[gcp]
 biopython
 google-cloud-storage
-tensorflow
 python-snappy
 blinker==1.4
+tensorflow-probability[tf]==0.24.0

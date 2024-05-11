@@ -15,6 +15,6 @@ RUN pip check
 
 FROM base
 COPY protein_folding/ ./protein_folding
-COPY assembly_training/trainer.py ./
+COPY assembly_training/thailam.py ./
 # Set the entrypoint to Apache Beam SDK launcher.
-ENTRYPOINT ["python3", "trainer.py"]
+ENTRYPOINT ["python3", "thailam.py"]
