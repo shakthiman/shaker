@@ -1,7 +1,7 @@
 import math
 import tensorflow as tf
 import random
-import tf_keras
+import tf.keras as tf_keras
 
 from protein_folding.variational_model import model
 
