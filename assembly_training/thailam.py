@@ -44,7 +44,7 @@ def main ():
   model_trainer.Train(
     ds=ds,
     shuffle_size=10,
-    batch_size=2*strategy.num_replicas_in_sync,
+    batch_size=16*strategy.num_replicas_in_sync,
     prefetch_size=150,
     pdb_vocab=pdb_vocab.PDBVocab(summary_blob),
     model=variational_model,
