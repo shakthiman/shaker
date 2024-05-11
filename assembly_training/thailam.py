@@ -15,9 +15,7 @@ def BetaAnneal(step):
   return tf.math.minimum(max_val_for_period, tf.cast(step%2000, tf.float32)*inc_per_step)
 
 def main ():
-  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(
-          #tpu="local"
-                                                                       )
+  cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver(tpu="local")
   tf.config.experimental_connect_to_cluster(cluster_resolver)
   tf.tpu.experimental.initialize_tpu_system(cluster_resolver)
   strategy = tf.distribute.TPUStrategy(cluster_resolver)
