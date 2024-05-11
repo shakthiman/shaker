@@ -51,10 +51,10 @@ class Distribution(object):
     self._loc = loc
     self._scale_diag = scale_diag
 
-  def mean():
+  def mean(self):
     return self._loc
 
-  def log_prob(x):
+  def log_prob(self, x):
     log2pi = tf.math.log(2. * np.pi)
     return tf.reduce_sum(
         -0.5 * (((self._loc - x) / self._scale_diag)**2.)
