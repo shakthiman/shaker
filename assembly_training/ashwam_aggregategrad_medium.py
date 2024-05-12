@@ -8,6 +8,18 @@ from protein_folding.variational_model.models import sequence_latent_space_with_
 
 from google.cloud import storage
 
+class LinearSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
+  def __init__(self, initial_rate, eventual_rate, steps):
+    self._initial_rate = initial_rate
+    self._eventual_rate = eventual_rate
+    self._steps = steps
+
+  def __call(self, step):
+    if step>self._steps:
+      return self._eventual_rate
+    else:
+      return (self._eventual_rate-self._initial_rate)/(self._steps) * step + self._initial_rate
+
 def BetaAnneal(step):
   max_val_for_period = tf.math.minimum(10.0, 1.0 + 0.4*tf.cast(
       tf.math.floordiv(step, 2000), tf.float32))
@@ -34,7 +46,8 @@ def main ():
         v, config)
     variational_model.load_weights(
         'gs://variational_shaker_models/assembly_based_model_prod_ashwam_aggregategrad_rotpf3/version_186000')
-    optimizer = tf.keras.optimizers.Adam(clipnorm=5e5, amsgrad=True, gradient_accumulation_steps=32)
+    optimizer = tf.keras.optimizers.Adam(
+        learning_rate=LinearSchedule(1e-12, 1e-3, 2000), clipnorm=5e5, amsgrad=True, gradient_accumulation_steps=32)
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
                               blob_prefix='pdb_training_examples_mar_26/polypeptides',
