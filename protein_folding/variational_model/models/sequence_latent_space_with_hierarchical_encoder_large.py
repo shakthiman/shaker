@@ -452,6 +452,6 @@ def MODEL_FOR_TRAINING(vocab, config):
       model2.Conditioner(
         CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
       model2.Decoder(DecoderModel()),
-      model2.Encoder(EncoderModel(_NUM_TRANSFORMERS)),
+      model2.Encoder(EncoderModel(), _NUM_TRANSFORMERS),
       RotationModel(),
       model2.LocalTransformationModel(LocalCoordinates, LocalMask, GlobalCoordinates) if config.get('should_do_local_transform', False) else None)
