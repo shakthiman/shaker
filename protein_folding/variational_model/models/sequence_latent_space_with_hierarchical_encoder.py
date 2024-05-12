@@ -35,16 +35,19 @@ def PeptideIndx():
   return pos_indices
 
 def Reshape(keras_tensor, new_shape):
-  return tf.keras.layers.Lambda(lambda x: tf.reshape(x, new_shape))(keras_tensor)
+  return tf.keras.ops.reshape(keras_tensor, new_shape)
 
 def Pad(keras_tensor, paddings):
-  return tf.keras.layers.Lambda(lambda x: tf.pad(x, paddings))(keras_tensor)
+  return tf.keras.ops.pad(keras_tensor, paddings)
 
 def EnsureShape(keras_tensor, shape):
   return tf.keras.layers.Lambda(lambda x: tf.ensure_shape(x, shape))(keras_tensor)
 
 def CastFloatToBool(keras_tensor):
-  return tf.keras.layers.Lambda(lambda x: x>0)(keras_tensor)
+  return tf.keras.ops.cast(keras_tensor, dtype='bool')
+
+def Transpose(keras_tensor, perm):
+  return tf.keras.layers.Lambda(lambda x: tf.transpose(x, perm))(keras_tensor)
 
 def StraightenMultipeptideSequence(x, embedding_size):
   return Reshape(x,[
@@ -78,22 +81,25 @@ class CustomSelfAttention(tf_keras.layers.Layer):
     super(CustomSelfAttention, self).__init__()
     self._attention_layer = tf_keras.layers.MultiHeadAttention(num_heads, key_dim)
 
+  def compute_output_shape(self, input_tensor_shape, **kwargs):
+    return input_tensor_shape
+
   def call(self, input_tensor, input_mask):
     def _apply_attention(x):
       return self._attention_layer(x[0], x[0], x[0],
           tf.math.logical_and(
-            tf.expand_dims(x[1], -1),
-            tf.expand_dims(x[1], -2))
+            tf.expand_dims(tf.cast(x[1], tf.bool), -1),
+            tf.expand_dims(tf.cast(x[1], tf.bool), -2))
           )
     return tf.stack([
       _apply_attention((input_tensor[i], input_mask[i]))
       for i in range(_BATCH_SIZE)])
 
 def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
-  transposed_x = tf.transpose(refactored_x, perm)
-  transposed_mask = tf.transpose(refactored_mask, perm[:-1])
+  transposed_x = Transpose(refactored_x, perm)
+  transposed_mask = Transpose(refactored_mask, perm[:-1])
   score = attention_layer(transposed_x, transposed_mask)
-  return tf.transpose(score, perm)
+  return Transpose(score, perm)
 
 def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, timesteps, embedding_size, num_blocks)
