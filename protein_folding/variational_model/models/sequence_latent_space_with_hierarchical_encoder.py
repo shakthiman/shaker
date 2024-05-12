@@ -43,8 +43,8 @@ def Pad(keras_tensor, paddings):
 def EnsureShape(keras_tensor, shape):
   return tf.keras.layers.Lambda(lambda x: tf.ensure_shape(x, shape))(keras_tensor)
 
-def Cast(keras_tensor, tf_type):
-  return tf.keras.layers.Lambda(lambda x: tf.cast(x, tf_type))(keras_tensor)
+def CastFloatToBool(keras_tensor):
+  return tf.keras.layers.Lambda(lambda x: x>0)(keras_tensor)
 
 def StraightenMultipeptideSequence(x, embedding_size):
   return Reshape(x,[
@@ -97,7 +97,7 @@ def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
 
 def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, timesteps, embedding_size, num_blocks)
-  refactored_mask = RefactorXMask(Cast(inputs_mask, tf.bool), timesteps, num_blocks)
+  refactored_mask = RefactorXMask(CastFloatToBool(inputs_mask), timesteps, num_blocks)
   local_self_attention = CustomSelfAttention(num_heads, key_dim)(
       refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(
@@ -364,7 +364,7 @@ def DecoderModel():
       channel_size=base_embedding_size)
   transformer_output = EnsureShape(
       transformer_output, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
-  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, Cast(atom_mask, tf.bool))
+  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, CastFloatToBool(atom_mask))
   loc = tf_keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
   return tf_keras.Model(
