@@ -87,10 +87,10 @@ class CustomSelfAttention(tf_keras.layers.Layer):
   def call(self, input_tensor, input_mask):
     def _apply_attention(x):
       return self._attention_layer(x[0], x[0], x[0],
-          tf.expand_dims(
-            tf.math.logical_and(
-              tf.expand_dims(tf.cast(x[1], tf.bool), -1),
-              tf.expand_dims(tf.cast(x[1], tf.bool), -2))), 1)
+          tf.math.logical_and(
+            tf.expand_dims(tf.cast(x[1], tf.bool), -1),
+            tf.expand_dims(tf.cast(x[1], tf.bool), -2))
+          )
     return tf.stack([
       _apply_attention((input_tensor[i], input_mask[i]))
       for i in range(_BATCH_SIZE)])
@@ -297,7 +297,7 @@ def EncoderModel():
       EnsureShape(t, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
       for t in transformer_outputs]
   transformer_outputs = tf_keras.layers.concatenate(
-      [tf.keras.ops.expand_dims(t, 1) for t in transformer_outputs],
+      [tf.expand_dims(t, 1) for t in transformer_outputs],
       axis=1)
   fel = FinalEncoderLayer(6.0)
   return tf_keras.Model(
@@ -334,9 +334,8 @@ class DecoderLSTM(tf_keras.layers.Layer):
     self._batch_size = batch_size
   
   def call(self, input_tensor, input_mask):
-    input_mask = tf.ensure_shape(input_mask, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE])
     return tf.stack([
-      self._lstm_layer(sequences=input_tensor[i], mask=input_mask[i])
+      self._lstm_layer(inputs=input_tensor[i], mask=input_mask[i])
       for i in range(self._batch_size)])
 
 def DecoderModel():
@@ -407,11 +406,11 @@ def RotationModel():
   straightened_features = StraightenMultipeptideSequence(input_features, 6)
   straightened_mask = StraightenMultipeptideMask(atom_mask)
   straightened_features = (straightened_features *
-                           tf.keras.ops.expand_dims(straightened_mask, -1))
+                           tf.expand_dims(straightened_mask, -1))
   prediction = tf_keras.layers.Dense(3)(tf_keras.layers.Dense(100, 'gelu')(
       tf_keras.layers.Dense(100, 'gelu')(straightened_features)))
-  prediction = prediction * tf.keras.ops.expand_dims(straightened_mask, -1)
-  prediction = tf.math.reduce_sum(prediction, axis=1) / tf.keras.ops.expand_dims(tf.math.reduce_sum(straightened_mask, axis=1), -1)
+  prediction = prediction * tf.expand_dims(straightened_mask, -1)
+  prediction = tf.math.reduce_sum(prediction, axis=1) / tf.expand_dims(tf.math.reduce_sum(straightened_mask, axis=1), -1)
   return tf_keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
                         outputs=prediction)
 
@@ -457,7 +456,7 @@ def LocalRotationModel():
   prediction = tf_keras.layers.Dense(3)(tf_keras.layers.Dense(100, 'gelu')(
       tf_keras.layers.Dense(100, 'gelu')(input_features)))
   prediction = tf.math.divide_no_nan(tf.math.reduce_sum(
-      prediction*tf.keras.ops.expand_dims(local_atom_mask, -1), -2), num_local_atoms)
+      prediction*tf.expand_dims(local_atom_mask, -1), -2), num_local_atoms)
 
   prediction = EnsureShape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
   return tf_keras.Model(inputs=[local_normalized_coordinates_mean_removed, local_atom_mask, num_local_atoms, local_predicted_coordinates_mean_removed],
