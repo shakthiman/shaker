@@ -8,12 +8,10 @@ import numpy as np
 from tensorflow_graphics.geometry.transformation import rotation_matrix_3d
 
 def _SaveModel(model, location):
-  model.save(location + '.keras', overwrite=True,
-      options=tf.saved_model.SaveOptions())
+  model.save(location + '.keras', overwrite=True)
 
 def _SaveWeights(model, location):
-  model.save_weights(location + '.weights.h5', overwrite=True,
-      options=tf.train.CheckpointOptions())
+  model.save_weights(location + '.weights.h5', overwrite=True)
 
 def _XMask(x):
     return tf.cast(

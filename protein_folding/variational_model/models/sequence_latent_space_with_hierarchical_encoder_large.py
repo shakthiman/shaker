@@ -1,7 +1,7 @@
 import math
 import tensorflow as tf
 import random
-import tf_keras
+import tensorflow.keras as tf_keras
 
 from protein_folding.variational_model import model
 
@@ -16,11 +16,11 @@ _CONFIG = None
 
 _LOCAL_ATOMS_SIZE = 100
 
-def AminoAcidPositionalEmbedding(cond):
+def AminoAcidPositionalEmbedding():
   pos_indices = tf.expand_dims(
       tf.expand_dims(tf.expand_dims(
-        tf.range(tf.shape(cond)[2], dtype='float32'), 0), 0) *
-      tf.ones(tf.shape(cond)[:-1]), -1)
+        tf.range(_ATOMS_PER_SEQUENCE, dtype='float32'), 0), 0) *
+      tf.ones([_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE]), -1)
   half_dim = _AMINO_ACID_EMBEDDING_DIMS // 2
   pemb = tf.math.log(20_000.0) / (half_dim - 1)
   pemb = tf.math.exp(tf.range(half_dim, dtype='float') * - pemb)
@@ -34,20 +34,35 @@ def PeptideIndx():
   pos_indices = pos_indices * tf.ones([_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 1])
   return pos_indices
 
+def Reshape(keras_tensor, new_shape):
+  return tf.keras.ops.reshape(keras_tensor, new_shape)
+
+def Pad(keras_tensor, paddings):
+  return tf.keras.ops.pad(keras_tensor, paddings)
+
+def EnsureShape(keras_tensor, shape):
+  return tf.keras.layers.Lambda(lambda x: tf.ensure_shape(x, shape))(keras_tensor)
+
+def CastFloatToBool(keras_tensor):
+  return tf.keras.ops.cast(keras_tensor, dtype='bool')
+
+def Transpose(keras_tensor, perm):
+  return tf.keras.layers.Lambda(lambda x: tf.transpose(x, perm))(keras_tensor)
+
 def StraightenMultipeptideSequence(x, embedding_size):
-  return tf.reshape(x,[
+  return Reshape(x,[
     _BATCH_SIZE, # Batch size remains the same.
     _NUM_PEPTIDES*_ATOMS_PER_SEQUENCE, # Amino acid dimension.
     embedding_size])
 
 def StraightenMultipeptideMask(atom_mask):
-  return tf.reshape(atom_mask, [
+  return Reshape(atom_mask, [
     _BATCH_SIZE, # Batch size remains the same.
     _NUM_PEPTIDES*_ATOMS_PER_SEQUENCE # Amino Acid dimension.
     ])
 
 def RefactorX(x, timesteps, embedding_size, n):
-  return tf.reshape(x, [
+  return Reshape(x, [
     _BATCH_SIZE, # Batch size remains the same.
     n, # Additional blocks are introduced.
     timesteps // n, # Number of timesteps reduced by a factor of n.
@@ -55,7 +70,7 @@ def RefactorX(x, timesteps, embedding_size, n):
     ])
 
 def RefactorXMask(x_mask, timesteps,n):
-  return tf.reshape(x_mask, [
+  return Reshape(x_mask, [
     _BATCH_SIZE, # Batch size remains the same.
     n, # Additional blocks are introduced.
     timesteps // n # Number of timesteps reduced by a factor of n.
@@ -66,26 +81,29 @@ class CustomSelfAttention(tf_keras.layers.Layer):
     super(CustomSelfAttention, self).__init__()
     self._attention_layer = tf_keras.layers.MultiHeadAttention(num_heads, key_dim)
 
+  def compute_output_shape(self, input_tensor_shape, **kwargs):
+    return input_tensor_shape
+
   def call(self, input_tensor, input_mask):
     def _apply_attention(x):
       return self._attention_layer(x[0], x[0], x[0],
-          tf.math.logical_and(
-            tf.expand_dims(x[1], -1),
-            tf.expand_dims(x[1], -2))
-          )
+          attention_mask=tf.math.logical_and(
+            tf.expand_dims(tf.cast(x[1], tf.bool), -1),
+            tf.expand_dims(tf.cast(x[1], tf.bool), -2)))
+
     return tf.stack([
       _apply_attention((input_tensor[i], input_mask[i]))
       for i in range(_BATCH_SIZE)])
 
 def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
-  transposed_x = tf.transpose(refactored_x, perm)
-  transposed_mask = tf.transpose(refactored_mask, perm[:-1])
+  transposed_x = Transpose(refactored_x, perm)
+  transposed_mask = Transpose(refactored_mask, perm[:-1])
   score = attention_layer(transposed_x, transposed_mask)
-  return tf.transpose(score, perm)
+  return Transpose(score, perm)
 
 def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, inputs, inputs_mask):
   refactored_x = RefactorX(inputs, timesteps, embedding_size, num_blocks)
-  refactored_mask = RefactorXMask(tf.cast(inputs_mask, tf.bool), timesteps, num_blocks)
+  refactored_mask = RefactorXMask(CastFloatToBool(inputs_mask), timesteps, num_blocks)
   local_self_attention = CustomSelfAttention(num_heads, key_dim)(
       refactored_x, refactored_mask)
   global_self_attention = TransposeAndAttend(
@@ -95,17 +113,17 @@ def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, in
                                             axis=[1,2])(
       tf_keras.layers.Add()([
         inputs,
-        tf.reshape(local_self_attention, [_BATCH_SIZE, timesteps, embedding_size]),
-        tf.reshape(global_self_attention, [_BATCH_SIZE, timesteps, embedding_size])]))
+        Reshape(local_self_attention, [_BATCH_SIZE, timesteps, embedding_size]),
+        Reshape(global_self_attention, [_BATCH_SIZE, timesteps, embedding_size])]))
 
 def FeedForwardLayer(num_layers, ideal_sequence_size, output_size, inputs):
   t = inputs
   for i in range(num_layers):
     t = tf_keras.layers.Dense(100, 'gelu')(t)
   t = tf_keras.layers.Dense(output_size)(t)
-  t = tf.ensure_shape(t, [_BATCH_SIZE, ideal_sequence_size, output_size])
+  t = EnsureShape(t, [_BATCH_SIZE, ideal_sequence_size, output_size])
   added_val = tf_keras.layers.Add()([inputs, t])
-  added_val = tf.ensure_shape(added_val, [_BATCH_SIZE, ideal_sequence_size, output_size])
+  added_val = EnsureShape(added_val, [_BATCH_SIZE, ideal_sequence_size, output_size])
   return tf_keras.layers.LayerNormalization(name='layer-normalization-2-'+str(random.randint(0, 1000000)),
                                             axis=[1,2])(
       added_val)
@@ -116,7 +134,7 @@ def EncoderTransformerLayer(num_transformers, num_blocks, num_heads, key_dim,
   x_list = []
   for i in range(num_transformers):
     x = AttentionLayer(num_blocks, num_heads, key_dim, ideal_sequence_size, output_size, x, inputs_mask)
-    x = tf.ensure_shape(x, [_BATCH_SIZE, ideal_sequence_size, output_size])
+    x = EnsureShape(x, [_BATCH_SIZE, ideal_sequence_size, output_size])
     x = FeedForwardLayer(num_dnn_layers, ideal_sequence_size, output_size, x)
     x_list.append(x)
   return x_list
@@ -139,10 +157,10 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
   paddings = [[0, 0],
               [0, ideal_sequence_size-sequence_size],
               [0, 0]]
-  padded_features = tf.pad(straightened_features, paddings)
-  padded_features = tf.ensure_shape(padded_features,
+  padded_features = Pad(straightened_features, paddings)
+  padded_features = EnsureShape(padded_features,
       [_BATCH_SIZE, ideal_sequence_size, num_transformer_channels])
-  padded_mask = tf.pad(straightened_mask, [
+  padded_mask = Pad(straightened_mask, [
     [0, 0],
     [0, ideal_sequence_size-sequence_size]])
   transformer_outputs = EncoderTransformerLayer(
@@ -159,7 +177,7 @@ def _EncoderTransformer(base_features, atom_mask, num_blocks, num_transformer_ch
   transformer_outputs = HierarchicalNoise(
       transformer_outputs, num_transformer_channels, 2)
 
-  transformer_outputs = [tf.reshape(t,
+  transformer_outputs = [Reshape(t,
     [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, num_transformer_channels])
     for t in transformer_outputs]
   return transformer_outputs
@@ -178,13 +196,13 @@ def DecoderTransformLayer(num_blocks, num_heads, key_dim,
     z = z_list[i]
     transformer_input = tf_keras.layers.concatenate(
         [x, z])
-    transformer_input = tf.ensure_shape(transformer_input,
+    transformer_input = EnsureShape(transformer_input,
         [_BATCH_SIZE, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE])
     transformer_input = AttentionLayer(
         num_blocks, num_heads, key_dim, ideal_sequence_size, channel_size + _LATENT_EMBEDDING_SIZE, transformer_input, inputs_mask)
     conv_inputs = tf_keras.layers.Conv1D(32, 100, padding='same')(
         transformer_input)
-    conv_inputs = tf.ensure_shape(conv_inputs, [_BATCH_SIZE, ideal_sequence_size, 32])
+    conv_inputs = EnsureShape(conv_inputs, [_BATCH_SIZE, ideal_sequence_size, 32])
     x = FeedForwardLayer(num_dnn_layers, ideal_sequence_size, channel_size,
         tf_keras.layers.Dense(channel_size)(
             tf_keras.layers.concatenate([transformer_input, conv_inputs])))
@@ -203,11 +221,11 @@ def _DecoderTransformer(
   paddings = [[0, 0],
               [0, ideal_sequence_size-sequence_size],
               [0, 0]]
-  padded_features = tf.pad(straightened_features, paddings)
-  padded_features = tf.ensure_shape(padded_features,
+  padded_features = Pad(straightened_features, paddings)
+  padded_features = EnsureShape(padded_features,
       [_BATCH_SIZE, ideal_sequence_size, channel_size])
-  padded_z_list = [tf.pad(z, paddings) for z in straightened_z_list]
-  padded_mask = tf.pad(straightened_mask, [
+  padded_z_list = [Pad(z, paddings) for z in straightened_z_list]
+  padded_mask = Pad(straightened_mask, [
     [0, 0],
     [0, ideal_sequence_size-sequence_size]])
   transformer_outputs = DecoderTransformLayer(
@@ -221,7 +239,7 @@ def _DecoderTransformer(
       z_list=padded_z_list,
       channel_size=channel_size)
   transformer_outputs = transformer_outputs[:,:sequence_size,:]
-  transformer_outputs = tf.reshape(transformer_outputs,
+  transformer_outputs = Reshape(transformer_outputs,
       [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, channel_size])
   return transformer_outputs
 
@@ -266,7 +284,7 @@ def EncoderModel():
       name='cond')
 
   # Compute Amino Acid Positional Embedding
-  pemb = AminoAcidPositionalEmbedding(cond)
+  pemb = AminoAcidPositionalEmbedding()
   peptide_indx = PeptideIndx()
 
   num_blocks = 200
@@ -276,10 +294,10 @@ def EncoderModel():
   transformer_outputs = _EncoderTransformer(
       base_features, atom_mask, num_blocks, base_embedding_size)
   transformer_outputs = [
-      tf.ensure_shape(t, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
+      EnsureShape(t, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
       for t in transformer_outputs]
   transformer_outputs = tf_keras.layers.concatenate(
-      [tf.expand_dims(t, 1) for t in transformer_outputs],
+      [tf.keras.ops.expand_dims(t, 1) for t in transformer_outputs],
       axis=1)
   fel = FinalEncoderLayer(6.0)
   return tf_keras.Model(
@@ -316,8 +334,9 @@ class DecoderLSTM(tf_keras.layers.Layer):
     self._batch_size = batch_size
   
   def call(self, input_tensor, input_mask):
+    input_mask = tf.ensure_shape(input_mask, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE])
     return tf.stack([
-      self._lstm_layer(inputs=input_tensor[i], mask=input_mask[i])
+      self._lstm_layer(sequences=input_tensor[i], mask=input_mask[i])
       for i in range(self._batch_size)])
 
 def DecoderModel():
@@ -332,10 +351,12 @@ def DecoderModel():
       shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, _COND_EMBEDDING_SIZE],
       name='cond')
 
-  z_list = tf.unstack(dropout_z, _NUM_TRANSFORMERS, axis=1)
+  z_list = tf.keras.layers.Lambda(
+      lambda x: tf.unstack(
+        x, _NUM_TRANSFORMERS, axis=1))(dropout_z)
 
   # Compute Amino Acid Positional Embedding
-  pemb = AminoAcidPositionalEmbedding(cond)
+  pemb = AminoAcidPositionalEmbedding()
   peptide_indx = PeptideIndx()
 
   num_blocks = 200
@@ -348,9 +369,9 @@ def DecoderModel():
       atom_mask=atom_mask,
       num_blocks=num_blocks,
       channel_size=base_embedding_size)
-  transformer_output = tf.ensure_shape(
+  transformer_output = EnsureShape(
       transformer_output, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
-  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
+  lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, CastFloatToBool(atom_mask))
   loc = tf_keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
   return tf_keras.Model(
@@ -386,32 +407,32 @@ def RotationModel():
   straightened_features = StraightenMultipeptideSequence(input_features, 6)
   straightened_mask = StraightenMultipeptideMask(atom_mask)
   straightened_features = (straightened_features *
-                           tf.expand_dims(straightened_mask, -1))
+                           tf.keras.ops.expand_dims(straightened_mask, -1))
   prediction = tf_keras.layers.Dense(3)(tf_keras.layers.Dense(100, 'gelu')(
       tf_keras.layers.Dense(100, 'gelu')(straightened_features)))
-  prediction = prediction * tf.expand_dims(straightened_mask, -1)
-  prediction = tf.math.reduce_sum(prediction, axis=1) / tf.expand_dims(tf.math.reduce_sum(straightened_mask, axis=1), -1)
+  prediction = prediction * tf.keras.ops.expand_dims(straightened_mask, -1)
+  prediction = tf.keras.ops.sum(prediction, axis=1) / tf.keras.ops.expand_dims(tf.keras.ops.sum(straightened_mask, axis=1), -1)
   return tf_keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
                         outputs=prediction)
 
 def GlobalCoordinates(local_normalized_coordinates):
-  local_normalized_coordinates = tf.ensure_shape(
+  local_normalized_coordinates = EnsureShape(
       local_normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, _LOCAL_ATOMS_SIZE, 3])
-  return tf.reshape(local_normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+  return Reshape(local_normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
 
 def LocalCoordinates(normalized_coordinates):
-  normalized_coordinates = tf.ensure_shape(
+  normalized_coordinates = EnsureShape(
       normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
-  return tf.reshape(normalized_coordinates,
+  return Reshape(normalized_coordinates,
                     [_BATCH_SIZE,
                      _NUM_PEPTIDES,
                      _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE,
                      _LOCAL_ATOMS_SIZE, 3])
 
 def LocalMask(atom_mask):
-  atom_mask = tf.ensure_shape(
+  atom_mask = EnsureShape(
       atom_mask, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE])
-  return tf.reshape(atom_mask,
+  return Reshape(atom_mask,
                     [_BATCH_SIZE,
                      _NUM_PEPTIDES,
                      _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE,
@@ -435,10 +456,10 @@ def LocalRotationModel():
 
   prediction = tf_keras.layers.Dense(3)(tf_keras.layers.Dense(100, 'gelu')(
       tf_keras.layers.Dense(100, 'gelu')(input_features)))
-  prediction = tf.math.divide_no_nan(tf.math.reduce_sum(
-      prediction*tf.expand_dims(local_atom_mask, -1), -2), num_local_atoms)
+  prediction = tf.math.divide_no_nan(tf.keras.ops.sum(
+      prediction*tf.keras.ops.expand_dims(local_atom_mask, -1), -2), num_local_atoms)
 
-  prediction = tf.ensure_shape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
+  prediction = EnsureShape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
   return tf_keras.Model(inputs=[local_normalized_coordinates_mean_removed, local_atom_mask, num_local_atoms, local_predicted_coordinates_mean_removed],
                         outputs=prediction)
 
