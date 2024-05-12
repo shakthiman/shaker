@@ -14,7 +14,7 @@ class LinearSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
     self._eventual_rate = eventual_rate
     self._steps = steps
 
-  def __call(self, step):
+  def __call__(self, step):
     if step>self._steps:
       return self._eventual_rate
     else:
