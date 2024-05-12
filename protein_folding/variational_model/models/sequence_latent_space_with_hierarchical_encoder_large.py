@@ -108,9 +108,9 @@ def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, in
       tf_keras.layers.Add()([
         inputs,
         attention_layer(inputs, inputs, inputs,
-                        attention_mask=tf.math.logical_and(
-                          tf.expand_dims(tf.cast(inputs_mask, tf.bool), -1),
-                          tf.expand_dims(tf.cast(inputs_mask, tf.bool), -2)
+                        attention_mask=tf.keras.ops.logical_and(
+                          tf.keras.ops.expand_dims(inputs_mask, -1),
+                          tf.keras.ops.expand_dims(inputs_mask, -2)
                           ))]))
 
 def FeedForwardLayer(num_layers, ideal_sequence_size, output_size, inputs):
