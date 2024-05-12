@@ -46,8 +46,7 @@ def main ():
         v, config)
     variational_model.load_weights(
         'gs://variational_shaker_models/assembly_based_model_prod_ashwam_aggregategrad_rotpf3/version_186000')
-    optimizer = tf.keras.optimizers.Adam(
-        learning_rate=LinearSchedule(1e-12, 1e-3, 2000), clipnorm=5e5, amsgrad=True, gradient_accumulation_steps=32)
+    optimizer = tf.keras.optimizers.Adam(clipnorm=5e5, amsgrad=True, gradient_accumulation_steps=32)
   ds = train_ds.GetTFExamples(project='shaker-388116',
                               bucket='unreplicated-training-data',
                               blob_prefix='pdb_training_examples_mar_26/polypeptides',
