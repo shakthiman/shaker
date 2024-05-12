@@ -284,7 +284,7 @@ def EncoderModel():
       axis=1)
   return tf_keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
-      outputs=*EncoderOutputs(transformer_outputs))
+      outputs=EncoderOutputs(transformer_outputs))
 
 class ClipMinMax(tf_keras.constraints.Constraint):
   def __init__(self, min_val, max_val):
