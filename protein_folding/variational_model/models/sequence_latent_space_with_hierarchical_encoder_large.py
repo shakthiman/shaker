@@ -279,9 +279,6 @@ def EncoderModel():
   transformer_outputs = [
       EnsureShape(t, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
       for t in transformer_outputs]
-  transformer_outputs = tf_keras.layers.concatenate(
-      [tf.keras.ops.expand_dims(t, 1) for t in transformer_outputs],
-      axis=1)
   return tf_keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
       outputs=EncoderOutputs(transformer_outputs))
