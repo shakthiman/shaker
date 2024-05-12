@@ -102,19 +102,16 @@ def TransposeAndAttend(attention_layer, refactored_x, refactored_mask, perm):
   return Transpose(score, perm)
 
 def AttentionLayer(num_blocks, num_heads, key_dim, timesteps, embedding_size, inputs, inputs_mask):
-  refactored_x = RefactorX(inputs, timesteps, embedding_size, num_blocks)
-  refactored_mask = RefactorXMask(CastFloatToBool(inputs_mask), timesteps, num_blocks)
-  local_self_attention = CustomSelfAttention(num_heads, key_dim)(
-      refactored_x, refactored_mask)
-  global_self_attention = TransposeAndAttend(
-      CustomSelfAttention(num_heads, key_dim), refactored_x,
-      refactored_mask, [0, 2, 1, 3])
+  attention_layer = tf_keras.layers.MultiHeadAttention(num_heads, key_dim)
   return tf_keras.layers.LayerNormalization(name='layer-normalization-1-'+str(random.randint(0, 1000000)),
                                             axis=[1,2])(
       tf_keras.layers.Add()([
         inputs,
-        Reshape(local_self_attention, [_BATCH_SIZE, timesteps, embedding_size]),
-        Reshape(global_self_attention, [_BATCH_SIZE, timesteps, embedding_size])]))
+        attention_layer(inputs, inputs, inputs,
+                        attention_mask=tf.math.logical_and(
+                          tf.expand_dims(tf.cast(inputs_mask, tf.bool), -1),
+                          tf.expand_dims(tf.cast(inputs_mask, tf.bool), -2)
+                          ))]))
 
 def FeedForwardLayer(num_layers, ideal_sequence_size, output_size, inputs):
   t = inputs
