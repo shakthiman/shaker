@@ -87,9 +87,10 @@ class CustomSelfAttention(tf_keras.layers.Layer):
   def call(self, input_tensor, input_mask):
     def _apply_attention(x):
       return self._attention_layer(x[0], x[0], x[0],
-          attention_mask=tf.math.logical_and(
-            tf.expand_dims(tf.cast(x[1], tf.bool), -1),
-            tf.expand_dims(tf.cast(x[1], tf.bool), -2)))
+          tf.expand_dims(
+            tf.math.logical_and(
+              tf.expand_dims(tf.cast(x[1], tf.bool), -1),
+              tf.expand_dims(tf.cast(x[1], tf.bool), -2))), 1)
     return tf.stack([
       _apply_attention((input_tensor[i], input_mask[i]))
       for i in range(_BATCH_SIZE)])
@@ -410,7 +411,7 @@ def RotationModel():
   prediction = tf_keras.layers.Dense(3)(tf_keras.layers.Dense(100, 'gelu')(
       tf_keras.layers.Dense(100, 'gelu')(straightened_features)))
   prediction = prediction * tf.keras.ops.expand_dims(straightened_mask, -1)
-  prediction = tf.keras.ops.sum(prediction, axis=1) / tf.keras.ops.expand_dims(tf.keras.ops.sum(straightened_mask, axis=1), -1)
+  prediction = tf.math.reduce_sum(prediction, axis=1) / tf.keras.ops.expand_dims(tf.math.reduce_sum(straightened_mask, axis=1), -1)
   return tf_keras.Model(inputs=[normalized_coordinates, atom_mask, predicted_coordinates],
                         outputs=prediction)
 
@@ -455,7 +456,7 @@ def LocalRotationModel():
 
   prediction = tf_keras.layers.Dense(3)(tf_keras.layers.Dense(100, 'gelu')(
       tf_keras.layers.Dense(100, 'gelu')(input_features)))
-  prediction = tf.math.divide_no_nan(tf.keras.ops.sum(
+  prediction = tf.math.divide_no_nan(tf.math.reduce_sum(
       prediction*tf.keras.ops.expand_dims(local_atom_mask, -1), -2), num_local_atoms)
 
   prediction = EnsureShape(prediction, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE//_LOCAL_ATOMS_SIZE, 3])
