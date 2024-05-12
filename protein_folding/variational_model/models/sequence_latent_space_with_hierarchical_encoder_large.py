@@ -3,7 +3,7 @@ import tensorflow as tf
 import random
 import tensorflow.keras as tf_keras
 
-from protein_folding.variational_model import model
+from protein_folding.variational_model import model2
 
 _COND_EMBEDDING_SIZE = 6
 _LATENT_EMBEDDING_SIZE = 30
@@ -249,24 +249,10 @@ def sigma2(gamma):
 def alpha(gamma):
   return tf.math.sqrt(1-sigma2(gamma))
 
-class FinalEncoderLayer(tf_keras.layers.Layer):
-  def __init__(self, initial_gamma_value):
-    super(FinalEncoderLayer, self).__init__()
-    self._initial_gamma_value = initial_gamma_value
-
-  def build(self, input_shape):
-    if _CONFIG.get('scale_coordinates', True):
-      self._gamma_variable = tf.Variable(self._initial_gamma_value, name='gamma')
-
-  def call(self, normalized_coordinates):
-    a = 1.0
-    logvar = 0
-    if _CONFIG.get('scale_coordinates', True):
-      a = alpha(self._gamma_variable)
-      logvar = log_sigma2(self._gamma_variable)
-    return tf_keras.layers.concatenate(
-        inputs=[a*normalized_coordinates, logvar*tf.ones_like(normalized_coordinates)],
-        axis=1)
+def EncoderOutputs(encoder_transformer_outputs):
+  return (encoder_transformer_outputs +
+          len(encoder_transformer_outputs)*[
+            tf.keras.ops.zeros_like(encoder_transformer_outputs[0])])
 
 def EncoderModel():
   # The inputs.
@@ -296,10 +282,9 @@ def EncoderModel():
   transformer_outputs = tf_keras.layers.concatenate(
       [tf.keras.ops.expand_dims(t, 1) for t in transformer_outputs],
       axis=1)
-  fel = FinalEncoderLayer(6.0)
   return tf_keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
-      outputs=fel(transformer_outputs))
+      outputs=*EncoderOutputs(transformer_outputs))
 
 class ClipMinMax(tf_keras.constraints.Constraint):
   def __init__(self, min_val, max_val):
@@ -338,9 +323,11 @@ class DecoderLSTM(tf_keras.layers.Layer):
 
 def DecoderModel():
   # The inputs.
-  z = tf_keras.Input(shape=[_NUM_TRANSFORMERS, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, _LATENT_EMBEDDING_SIZE], name='z')
+  zs = [tf_keras.Input(shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, _LATENT_EMBEDDING_SIZE], name='z_'+str(i))
+        for i in range(_NUM_TRANSFORMERS)]
   # Drop some of the latent layer to improve robustness.
-  dropout_z = tf_keras.layers.Dropout(0.2)(z)
+  dropout_zs = [tf_keras.layers.Dropout(0.2)(z)
+                for z in zs]
   atom_mask = tf_keras.Input(
       shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE],
       name='atom_mask')
@@ -348,9 +335,7 @@ def DecoderModel():
       shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, _COND_EMBEDDING_SIZE],
       name='cond')
 
-  z_list = tf.keras.layers.Lambda(
-      lambda x: tf.unstack(
-        x, _NUM_TRANSFORMERS, axis=1))(dropout_z)
+  z_list = dropout_zs
 
   # Compute Amino Acid Positional Embedding
   pemb = AminoAcidPositionalEmbedding()
@@ -372,7 +357,7 @@ def DecoderModel():
   loc = tf_keras.layers.Dense(3)(lstm_output)
   fdl = FinalDecoderLayer(1.0)
   return tf_keras.Model(
-      inputs=[z, atom_mask, cond],
+      inputs=zs + [atom_mask, cond],
       outputs=fdl(loc))
 
 def CondModel(residue_lookup_size, atom_lookup_size):
@@ -463,10 +448,10 @@ def LocalRotationModel():
 def MODEL_FOR_TRAINING(vocab, config):
   global _CONFIG
   _CONFIG = config
-  return model.VariationalModel(
-      model.Conditioner(
+  return model2.VariationalModel(
+      model2.Conditioner(
         CondModel(vocab.ResidueLookupSize(), vocab.AtomLookupSize())),
-      model.Decoder(DecoderModel()),
-      model.Encoder(EncoderModel()),
+      model2.Decoder(DecoderModel()),
+      model2.Encoder(EncoderModel(_NUM_TRANSFORMERS)),
       RotationModel(),
-      model.LocalTransformationModel(LocalCoordinates, LocalMask, GlobalCoordinates) if config.get('should_do_local_transform', False) else None)
+      model2.LocalTransformationModel(LocalCoordinates, LocalMask, GlobalCoordinates) if config.get('should_do_local_transform', False) else None)
