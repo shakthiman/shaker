@@ -152,7 +152,7 @@ class LocalTransformationModel(object):
 
 
 LossInformation = collections.namedtuple(
-    'LossInformation', ['loss', 'loss_beta_1', 'local_logpx_z', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae', 'local_diff_mae'])
+    'LossInformation', ['loss', 'loss_beta_1', 'local_logpx_z', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae', 'local_diff_mae', 'adjacent_alpha_carbon_distance_loss', 'distance_loss'])
 class VariationalModel(object):
   def __init__(self, conditioner, decoder, encoder, rotation_model=None, local_transformation_model=None):
     self._conditioner = conditioner
@@ -201,7 +201,58 @@ class VariationalModel(object):
     euler_rotation = tf.ensure_shape(euler_rotation, [None, 3])
     return rotation_matrix_3d.from_euler(euler_rotation)
 
-  def compute_loss(self, training_data, training, beta=1.0):
+  def _distance_matrix(self, normalized_coordinates):
+    coord1 = tf.expand_dims(tf.expand_dims(normalized_coordinates, -2), -2)
+    coord2 = tf.expand_dims(tf.expand_dims(normalized_coordinates, 1), 1)
+    return tf.math.reduce_sum(tf.math.abs(coord1 - coord2), -1)
+
+  def _matrix_mask(self, mask):
+    mask1 = tf.expand_dims(tf.expand_dims(mask, -2), -2)
+    mask2 = tf.expand_dims(tf.expand_dims(mask, 1), 1)
+    matrix_mask = tf.math.logical_and(mask1, mask2)
+    return matrix_mask
+
+  def _adjacent_alpha_carbon_distance(
+      self, normalized_coordinates, predicted_coordinates, is_alpha_carbon):
+    # a[0] is the aggregate distance.
+    # a[1] is the true coordinate of the previous alpha carbon.
+    # a[2] is predicted true coordinate of the previous alpha carbon.
+    # a[3] indicates if the first alpha carbo has been hit
+    # x[0] is the true coordinate of the current alpha carbon.
+    # x[1] is the predicted coordinate of the current alpha carbon.
+    # x[2] indicates if teh current atom is an alpha carbon.
+    def _aggregate_fn(a, x):
+      def _current_distance_loss():
+        tf.cond(a[3],
+                lambda: tf.math.abs(
+                  tf.math.reduce_sum(tf.math.abs(a[1]-x[0])) -
+                  tf.math.reduce_sum(tf.math.abs(a[2]-x[1]))),
+                lambda: 0.0)
+      return tf.cond(x[2],
+                     lambda: (a[0] + _current_distance_loss(), x[0], x[1], True),
+                     lambda: a)
+    alpha_carbon_distances = tf.map_fn(
+        lambda x: tf.map_fn(
+          lambda y: tf.scan(_aggregate_fn,
+                            (y[0], y[1], y[2]),
+                            (0., 
+                             tf.constant([0., 0., 0.], dtype=tf.float32),
+                             tf.constant([0., 0., 0.], dtype=tf.float32),
+                             False)), (x[0], x[1], x[2])),
+                            (normalized_coordinates, predicted_coordinates, is_alpha_carbon))
+    return tf.math.reduce_sum(alpha_carbon_distances, axis=[1, 2])
+
+  def  _distance_loss(self, normalized_coordinates, predicted_coordinates,
+                      mask):
+    true_distance_matrix = self._distance_matrix(normalized_coordinates)
+    predicted_distance_matrix = self._distance_matrix(predicted_coordinates)
+
+    distance_loss = tf.math.reduce_sum(
+        tf.keras.ops.tril(tf.math.abs(true_distance_matrix-predicted_distance_matrix))*_matrix_mask(mask),
+        axis=[1, 2, 3, 4])
+    return distance_loss
+
+  def compute_loss(self, training_data, training, beta=1.0, config={}):
     atom_mask = _XMask(training_data['normalized_coordinates'])
     cond = self._conditioner.conditioning(
         training_data['residue_names'], training_data['atom_names'], training)
@@ -247,15 +298,27 @@ class VariationalModel(object):
                 tf.math.abs(normalized_coordinates - x.mean()),
                 tf.expand_dims(atom_mask, -1)))/tf.math.reduce_sum(atom_mask)
 
+    distance_loss = 0.
+    adjacent_alpha_carbon_distance_loss = 0.
+    if config.get('penalize_distance', False):
+      adjacent_alpha_carbon_distance_loss = (
+          tf.reduce_mean(self._adjacent_alpha_carbon_distance(
+            normalized_coordinates, x.mean(), training_data['atom_names']==config['alpha_carbon_name'])))
+      distance_loss = tf.reduce_mean(self._distance_loss(normalized_coordinates, x.mean(), atom_mask))
+
     return LossInformation(
-        loss=-tf.reduce_mean(logpx_z + local_logpx_z + beta*(logpz - logqz_x)),
+        loss=(-tf.reduce_mean(logpx_z + local_logpx_z + beta*(logpz - logqz_x))
+              + config.get('adjacent_alpha_carbon_penalty_term', 0.)*adjacent_alpha_carbon_distance_loss,
+              + config.get('distance_loss_term', 0.)*distance_loss),
         loss_beta_1 = -tf.reduce_mean(logpx_z + logpz - logqz_x),
         local_logpx_z=tf.reduce_mean(local_logpx_z),
         logpx_z=tf.reduce_mean(logpx_z),
         logpz=tf.reduce_mean(logpz),
         logqz_x=tf.reduce_mean(logqz_x),
         diff_mae=diff_mae,
-        local_diff_mae=local_diff_mae)
+        local_diff_mae=local_diff_mae,
+        adjacent_alpha_carbon_distance_loss=adjacent_alpha_carbon_distance_loss,
+        distance_loss=distance_loss)
 
   def save(self, location):
     self._conditioner.save(location + '/conditioner')

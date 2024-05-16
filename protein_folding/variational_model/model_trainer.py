@@ -15,6 +15,7 @@ OPTIMIZER = None
 BETA_FN = None
 TRAIN_STEPS = 100
 CONFIG = None
+MODEL_LOSS_CONFIG = None
 
 @tf.function(reduce_retracing=True)
 def _TrainStep(train_iterator, cpu_step):
@@ -66,7 +67,7 @@ def _TrainStep(train_iterator, cpu_step):
       loss_information = MODEL.compute_loss(
           training_data=training_data,
           training=True,
-          beta=beta)
+          beta=beta, config=MODEL_LOSS_CONFIG)
       loss = loss_information.loss
     trainable_weights = MODEL.trainable_weights()
     grads = tape.gradient(loss, trainable_weights)
@@ -92,12 +93,15 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
   global OPTIMIZER
   global BETA_FN
   global CONFIG
+  global MODEL_LOSS_CONFIG
 
   MODEL = model
   STRATEGY = strategy
   OPTIMIZER = optimizer
   BETA_FN = beta_fn
   CONFIG = config
+  MODEL_LOSS_CONFIG = CONFIG['model_loss_config'] | {
+          'alpha_carbon_name': pdb_vocab.GetAtomNamesId(tf.constant('CA'))}
 
   with STRATEGY.scope():
     ckpt = tf.train.Checkpoint(
@@ -145,6 +149,12 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         tf.summary.scalar('logqz_x', train_step_information[0].loss_information.logqz_x, step=cpu_step)
         tf.summary.scalar('diff_mae', train_step_information[0].loss_information.diff_mae, step=cpu_step)
         tf.summary.scalar('local_diff_mae', train_step_information[0].loss_information.local_diff_mae, step=cpu_step)
+        tf.summary.scalar('adjacent_alpha_carbon_distance_loss',
+                          train_step_information[0].loss_information.adjacent_alpha_carbon_distance_loss,
+                          step=cpu_step)
+        tf.summary.scalar('distance_loss',
+                          train_step_information[0].loss_information.distance_loss,
+                          step=cpu_step)
         tf.summary.scalar('grad_norm', train_step_information[0].grad_norm, step=cpu_step)
         tf.summary.scalar('max_grad_norm', train_step_information[0].max_grad_norm, step=cpu_step)
         tf.summary.scalar('max_grad_value', train_step_information[0].max_grad_value, step=cpu_step)
