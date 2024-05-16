@@ -223,7 +223,7 @@ class VariationalModel(object):
     # x[2] indicates if teh current atom is an alpha carbon.
     def _aggregate_fn(a, x):
       def _current_distance_loss():
-        tf.cond(a[3],
+        return tf.cond(a[3],
                 lambda: tf.math.abs(
                   tf.math.reduce_sum(tf.math.abs(a[1]-x[0])) -
                   tf.math.reduce_sum(tf.math.abs(a[2]-x[1]))),
