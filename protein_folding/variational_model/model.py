@@ -228,7 +228,7 @@ class VariationalModel(object):
     normalized_coordinates = tf.reshape(normalized_coordinates, [2, 4, 150, 40, 3])
     predicted_coordinates = tf.reshape(predicted_coordinates, [2, 4, 150, 40, 3])
     is_alpha_carbon = tf.reshape(is_alpha_carbon, [2, 4, 150, 40])
-    def _local_distance_matrix(coodinates):
+    def _local_distance_matrix(coordinates):
       coord1 = tf.expand_dims(coordinates, -2)
       coord2 = tf.expand_dims(coordinates, -3)
       return tf.math.reduce.sum(tf.math.abs(coord1 - coord2), -1)
