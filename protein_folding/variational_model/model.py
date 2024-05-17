@@ -235,7 +235,7 @@ class VariationalModel(object):
     def _local_matrix_mask(is_alpha_carbon):
       mask1 = tf.expand_dims(is_alpha_carbon, -1)
       mask2 = tf.expand_dims(is_alpha_carbon, -2)
-      return mask1 * mask2
+      return tf.math.logical_and(mask1, mask2)
 
     true_distance_matrix = _local_distance_matrix(normalized_coordinates)
     predicted_distance_matrix = _local_distance_matrix(normalized_coordinates)
