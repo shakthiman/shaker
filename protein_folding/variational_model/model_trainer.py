@@ -152,8 +152,14 @@ def Train(ds, shuffle_size, batch_size, prefetch_size,
         tf.summary.scalar('adjacent_alpha_carbon_distance_loss',
                           train_step_information[0].loss_information.adjacent_alpha_carbon_distance_loss,
                           step=cpu_step)
-        tf.summary.scalar('distance_loss',
-                          train_step_information[0].loss_information.distance_loss,
+        tf.summary.scalar('adjacent_atom_distance_loss',
+                          train_step_information[0].loss_information.adjacent_atom_distance_loss,
+                          step=cpu_step)
+        tf.summary.scalar('adjacent_per_pair_alpha_carbon_distance_loss',
+                          train_step_information[0].loss_information.adjacent_per_pair_alpha_carbon_distance_loss,
+                          step=cpu_step)
+        tf.summary.scalar('adjacent_per_pair_atom_distance_loss',
+                          train_step_information[0].loss_information.adjacent_per_pair_atom_distance_loss,
                           step=cpu_step)
         tf.summary.scalar('grad_norm', train_step_information[0].grad_norm, step=cpu_step)
         tf.summary.scalar('max_grad_norm', train_step_information[0].max_grad_norm, step=cpu_step)
