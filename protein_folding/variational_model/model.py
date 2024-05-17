@@ -214,12 +214,11 @@ class VariationalModel(object):
 
   def  _distance_loss(self, normalized_coordinates, predicted_coordinates,
                       mask):
-    mask = tf.cast(mask, tf.bool)
     true_distance_matrix = self._distance_matrix(tf.boolean_mask(normalized_coordinates, mask))
     predicted_distance_matrix = self._distance_matrix(tf.boolean_mask(predicted_coordinates, mask))
 
     distance_loss = tf.math.reduce_sum(
-            tf.math.abs(true_distance_matrix-predicted_distance_matrix),
+            tf.math.abs(true_distance_matrix-predicted_distance_matrix)*_matrix_mask(mask),
             axis=[1, 2, 3, 4])/2
     return distance_loss
 
@@ -241,7 +240,7 @@ class VariationalModel(object):
     true_distance_matrix = _local_distance_matrix(tf.boolean_mask(normalized_coordinates, is_alpha_carbon))
     predicted_distance_matrix = _local_distance_matrix(tf.boolean_mask(predicted_coordinates, is_alpha_carbon))
     distance_loss = tf.math.reduce_sum(
-            tf.math.abs(true_distance_matrix - predicted_distance_matrix),
+            tf.math.abs(true_distance_matrix - predicted_distance_matrix) * tf.cast(_local_matrix_mask(is_alpha_carbon), tf.float32),
             axis=[1,2,3,4])/2
     return distance_loss
 
