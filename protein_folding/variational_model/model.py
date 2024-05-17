@@ -209,7 +209,7 @@ class VariationalModel(object):
   def _matrix_mask(self, mask):
     mask1 = tf.expand_dims(tf.expand_dims(mask, -2), -2)
     mask2 = tf.expand_dims(tf.expand_dims(mask, 1), 1)
-    matrix_mask = tf.math.logical_and(mask1, mask2)
+    matrix_mask = mask1 * mask2
     return matrix_mask
 
   def _adjacent_alpha_carbon_distance(
@@ -233,14 +233,14 @@ class VariationalModel(object):
                      lambda: a)
     alpha_carbon_distances = tf.map_fn(
         lambda x: tf.map_fn(
-          lambda y: tf.scan(_aggregate_fn,
+          lambda y: tf.foldl(_aggregate_fn,
                             (y[0], y[1], y[2]),
                             (0., 
                              tf.constant([0., 0., 0.], dtype=tf.float32),
                              tf.constant([0., 0., 0.], dtype=tf.float32),
-                             False))[0], (x[0], x[1], x[2])),
-                            (normalized_coordinates, predicted_coordinates, is_alpha_carbon))
-    return tf.math.reduce_sum(alpha_carbon_distances, axis=[1, 2])
+                             False))[0], (x[0], x[1], x[2]), fn_output_signature=(tf.float32)),
+                            (normalized_coordinates, predicted_coordinates, is_alpha_carbon),fn_output_signature=(tf.float32))
+    return tf.math.reduce_sum(alpha_carbon_distances, axis=[1])
 
   def  _distance_loss(self, normalized_coordinates, predicted_coordinates,
                       mask):
@@ -248,7 +248,7 @@ class VariationalModel(object):
     predicted_distance_matrix = self._distance_matrix(predicted_coordinates)
 
     distance_loss = tf.math.reduce_sum(
-        tf.keras.ops.tril(tf.math.abs(true_distance_matrix-predicted_distance_matrix))*_matrix_mask(mask),
+        tf.keras.ops.tril(tf.math.abs(true_distance_matrix-predicted_distance_matrix))*self._matrix_mask(mask),
         axis=[1, 2, 3, 4])
     return distance_loss
 
