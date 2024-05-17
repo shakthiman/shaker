@@ -238,7 +238,7 @@ class VariationalModel(object):
                             (0., 
                              tf.constant([0., 0., 0.], dtype=tf.float32),
                              tf.constant([0., 0., 0.], dtype=tf.float32),
-                             False)), (x[0], x[1], x[2])),
+                             False))[0], (x[0], x[1], x[2])),
                             (normalized_coordinates, predicted_coordinates, is_alpha_carbon))
     return tf.math.reduce_sum(alpha_carbon_distances, axis=[1, 2])
 
