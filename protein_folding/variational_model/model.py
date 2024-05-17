@@ -231,15 +231,15 @@ class VariationalModel(object):
       return tf.cond(x[2],
                      lambda: (a[0] + _current_distance_loss(), x[0], x[1], True),
                      lambda: a)
-    alpha_carbon_distances = tf.map_fn(
-        lambda x: tf.map_fn(
-          lambda y: tf.foldl(_aggregate_fn,
-                            (y[0], y[1], y[2]),
-                            (0., 
-                             tf.constant([0., 0., 0.], dtype=tf.float32),
-                             tf.constant([0., 0., 0.], dtype=tf.float32),
-                             False))[0], (x[0], x[1], x[2]), fn_output_signature=(tf.float32)),
-                            (normalized_coordinates, predicted_coordinates, is_alpha_carbon),fn_output_signature=(tf.float32))
+    alpha_carbon_distances = tf.stack([
+      tf.foldl(
+          lambda a, y: a + tf.foldl(_aggregate_fn,
+                                    (y[0], y[1], y[2]),
+                                    (0., 
+                                     tf.constant([0., 0., 0.], dtype=tf.float32),
+                                     tf.constant([0., 0., 0.], dtype=tf.float32),
+                                     False))[0], (normalized_coordinates[i], predicted_coordinates[i], is_alpha_carbon[i]), 0.)
+                                    for i in range(2)])
     return tf.math.reduce_sum(alpha_carbon_distances, axis=[1])
 
   def  _distance_loss(self, normalized_coordinates, predicted_coordinates,
