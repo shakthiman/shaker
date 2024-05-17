@@ -219,8 +219,8 @@ class VariationalModel(object):
     predicted_distance_matrix = self._distance_matrix(tf.boolean_mask(predicted_coordinates, mask))
 
     distance_loss = tf.math.reduce_sum(
-        tf.keras.ops.tril(tf.math.abs(true_distance_matrix-predicted_distance_matrix)),
-        axis=[1, 2, 3, 4])
+            tf.math.abs(true_distance_matrix-predicted_distance_matrix),
+            axis=[1, 2, 3, 4])/2
     return distance_loss
 
   def _adjacent_alpha_carbon_distance(
@@ -241,9 +241,8 @@ class VariationalModel(object):
     true_distance_matrix = _local_distance_matrix(tf.boolean_mask(normalized_coordinates, is_alpha_carbon))
     predicted_distance_matrix = _local_distance_matrix(tf.boolean_mask(predicted_coordinates, is_alpha_carbon))
     distance_loss = tf.math.reduce_sum(
-        tf.keras.ops.tril(tf.math.abs(true_distance_matrix -
-                                      predicted_distance_matrix)),
-        axis=[1,2,3,4])
+            tf.math.abs(true_distance_matrix - predicted_distance_matrix),
+            axis=[1,2,3,4])/2
     return distance_loss
 
 
