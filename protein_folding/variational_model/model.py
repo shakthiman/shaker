@@ -218,7 +218,7 @@ class VariationalModel(object):
     predicted_distance_matrix = self._distance_matrix(predicted_coordinates)
 
     distance_loss = tf.math.reduce_sum(
-            tf.math.abs(true_distance_matrix-predicted_distance_matrix)*_matrix_mask(mask),
+            tf.math.abs(true_distance_matrix-predicted_distance_matrix)*self._matrix_mask(mask),
             axis=[1, 2, 3, 4])/2
     return distance_loss
 
