@@ -207,40 +207,10 @@ class VariationalModel(object):
     return tf.math.reduce_sum(tf.math.abs(coord1 - coord2), -1)
 
   def _matrix_mask(self, mask):
-    mask1 = tf.expand_dims(tf.expand_dims(mask, -2), -2)
+    mask1 = tf.expand_dims(tf.expand_dims(mask, -1), -1)
     mask2 = tf.expand_dims(tf.expand_dims(mask, 1), 1)
     matrix_mask = mask1 * mask2
     return matrix_mask
-
-  def _adjacent_alpha_carbon_distance(
-      self, normalized_coordinates, predicted_coordinates, is_alpha_carbon):
-    # a[0] is the aggregate distance.
-    # a[1] is the true coordinate of the previous alpha carbon.
-    # a[2] is predicted true coordinate of the previous alpha carbon.
-    # a[3] indicates if the first alpha carbo has been hit
-    # x[0] is the true coordinate of the current alpha carbon.
-    # x[1] is the predicted coordinate of the current alpha carbon.
-    # x[2] indicates if teh current atom is an alpha carbon.
-    def _aggregate_fn(a, x):
-      def _current_distance_loss():
-        return tf.cond(a[3],
-                lambda: tf.math.abs(
-                  tf.math.reduce_sum(tf.math.abs(a[1]-x[0])) -
-                  tf.math.reduce_sum(tf.math.abs(a[2]-x[1]))),
-                lambda: 0.0)
-      return tf.cond(x[2],
-                     lambda: (a[0] + _current_distance_loss(), x[0], x[1], True),
-                     lambda: a)
-    alpha_carbon_distances = tf.stack([
-      tf.foldl(
-          lambda a, y: a + tf.foldl(_aggregate_fn,
-                                    (y[0], y[1], y[2]),
-                                    (0., 
-                                     tf.constant([0., 0., 0.], dtype=tf.float32),
-                                     tf.constant([0., 0., 0.], dtype=tf.float32),
-                                     False))[0], (normalized_coordinates[i], predicted_coordinates[i], is_alpha_carbon[i]), 0.)
-                                    for i in range(2)])
-    return tf.math.reduce_sum(alpha_carbon_distances, axis=[1])
 
   def  _distance_loss(self, normalized_coordinates, predicted_coordinates,
                       mask):
@@ -251,6 +221,31 @@ class VariationalModel(object):
         tf.keras.ops.tril(tf.math.abs(true_distance_matrix-predicted_distance_matrix))*self._matrix_mask(mask),
         axis=[1, 2, 3, 4])
     return distance_loss
+
+  def _adjacent_alpha_carbon_distance(
+      self, normalized_coordinates, predicted_coordinates, is_alpha_carbon):
+    # TODO: Fill in the actual values.
+    normalized_coordinates = tf.reshape(normalized_coordinates, [2, 4, 150, 40, 3])
+    predicted_coordinates = tf.reshape(predicted_coordinates, [2, 4, 150, 40, 3])
+    is_alpha_carbon = tf.reshape(is_alpha_carbon, [2, 4, 150, 40])
+    def _local_distance_matrix(coodinates):
+      coord1 = tf.expand_dims(coordinates, -2)
+      coord2 = tf.expand_dims(coordinates, -3)
+      return tf.math.reduce.sum(tf.math.abs(coord1 - coord2), -1)
+    def _local_matrix_mask(is_alpha_carbon):
+      mask1 = tf.expand_dims(is_alpha_carbon, -1)
+      mask2 = tf.expand_dims(is_alpha_carbon, -2)
+      return mask1 * mask2
+
+    true_distance_matrix = _local_distance_matrix(normalized_coordinates)
+    predicted_distance_matrix = _local_distance_matrix(normalized_coordinates)
+    distance_loss = tf.math.reduce_sum(
+        tf.keras.ops.tril(tf.math.abs(true_distance_matrix -
+                                      predicted_distance_matrix)) *
+        _local_matrix_mask(is_alpha_carbon),
+        axis=[1,2,3,4])
+    return distance_loss
+
 
   def compute_loss(self, training_data, training, beta=1.0, config={}):
     atom_mask = _XMask(training_data['normalized_coordinates'])
