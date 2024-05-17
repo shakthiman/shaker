@@ -70,9 +70,9 @@ def main ():
     config={
         'model_loss_config': {
             'penalize_distance': True,
-            'adjacent_alpha_carbon_penalty_term': 20,
-            'distance_loss_term': 1e-4}},
-    start_cpu_step=186000)
+            'adjacent_alpha_carbon_penalty_term': 5,
+            'adjacent_atom_distance_loss': 1e-2}},
+    start_cpu_step=0)
 
 if __name__ == "__main__":
   main()
