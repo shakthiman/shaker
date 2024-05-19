@@ -265,16 +265,16 @@ def EncoderModel():
 
   embedding_output = transformer_outputs
   for i in range(5):
-    embedding_output = tf.keras.layers.Dense(100, 'gelu')(embedding_output)
-  embedding_output = tf.keras.layers.Dense(base_embedding_size)(embedding_output)
+    embedding_output = tf_keras.layers.Dense(100, 'gelu')(embedding_output)
+  embedding_output = tf_keras.layers.Dense(base_embedding_size)(embedding_output)
 
   logvar = transformer_outputs
   for i in range(5):
-    logvar = tf.keras.layers.Dense(100, 'gelu')(logvar)
-  logvar = tf.keras.layers.Dense(base_embedding_size)(logvar)
+    logvar = tf_keras.layers.Dense(100, 'gelu')(logvar)
+  logvar = tf_keras.layers.Dense(base_embedding_size)(logvar)
   return tf_keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
-      outputs=tf.keras.layers.concatenate(
+      outputs=tf_keras.layers.concatenate(
         inputs=[embedding_output, logvar],
         axis=1))
 
