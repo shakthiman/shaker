@@ -264,12 +264,12 @@ def EncoderModel():
       axis=1)
 
   embedding_output = transformer_outputs
-  for i in range(5):
+  for i in range(2):
     embedding_output = tf_keras.layers.Dense(100, 'gelu')(embedding_output)
   embedding_output = tf_keras.layers.Dense(base_embedding_size)(embedding_output)
 
   logvar = transformer_outputs
-  for i in range(5):
+  for i in range(2):
     logvar = tf_keras.layers.Dense(100, 'gelu')(logvar)
   logvar = tf_keras.layers.Dense(base_embedding_size)(logvar)
   return tf_keras.Model(
