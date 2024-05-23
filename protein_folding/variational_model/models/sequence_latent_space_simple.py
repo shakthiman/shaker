@@ -171,20 +171,20 @@ def alpha(gamma):
 class FinalEncoderLayer(tf_keras.layers.Layer):
   def __init__(self, initial_gamma_value):
     super(FinalEncoderLayer, self).__init__()
-    self._initial_gamma_value = initial_gamma_value * tf.ones(shape=[_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+    self._initial_gamma_value = initial_gamma_value
 
   def build(self, input_shape):
     self._gamma_variable = tf.Variable(
         self._initial_gamma_value,
-        name='gamma',
-        shape=[_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+        name='gamma')
 
   def call(self, normalized_coordinates):
-    normalized_coordinates = tf.ensure_shape(normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+    normalized_coordinates = tf.ensure_shape(normalized_coordinates,
+                                             [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
     a = alpha(self._gamma_variable)
     logvar = log_sigma2(self._gamma_variable)
     return tf_keras.layers.concatenate(
-        inputs=[a*normalized_coordinates, logvar],
+        inputs=[a*normalized_coordinates, logvar*tf.ones_like(normalized_coordinates)],
         axis=1)
 
 def EncoderModel():
