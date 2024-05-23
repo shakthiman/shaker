@@ -171,8 +171,7 @@ def alpha(gamma):
 class FinalEncoderLayer(tf_keras.layers.Layer):
   def __init__(self, initial_gamma_value):
     super(FinalEncoderLayer, self).__init__()
-    self._initial_gamma_value = initial_gamma_value * tf.ones(
-            shape=[_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
+    self._initial_gamma_value = initial_gamma_value * tf.ones(shape=[_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
 
   def build(self, input_shape):
     self._gamma_variable = tf.Variable(
@@ -181,6 +180,7 @@ class FinalEncoderLayer(tf_keras.layers.Layer):
         shape=[_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
 
   def call(self, normalized_coordinates):
+    normalized_coordinates = tf.ensure_shape(normalized_coordinates, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3])
     a = alpha(self._gamma_variable)
     logvar = log_sigma2(self._gamma_variable)
     return tf_keras.layers.concatenate(
@@ -202,7 +202,7 @@ def EncoderModel():
   fel = FinalEncoderLayer(6.0)
   return tf_keras.Model(
       inputs=[normalized_coordinates, atom_mask, cond],
-      outputs=fel(transformer_outputs))
+      outputs=fel(normalized_coordinates))
 
 class ClipMinMax(tf_keras.constraints.Constraint):
   def __init__(self, min_val, max_val):
@@ -240,7 +240,7 @@ class DecoderLSTM(tf_keras.layers.Layer):
 
 def DecoderModel():
   # The inputs.
-  z = tf_keras.Input(shape=[_NUM_TRANSFORMERS, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3], name='z')
+  z = tf_keras.Input(shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, 3], name='z')
   atom_mask = tf_keras.Input(
       shape=[_NUM_PEPTIDES, _ATOMS_PER_SEQUENCE],
       name='atom_mask')
@@ -253,7 +253,7 @@ def DecoderModel():
   peptide_indx = PeptideIndx()
 
   num_blocks = 200
-  base_embedding_size =_COND_EMBEDDING_SIZE + _AMINO_ACID_EMBEDDING_DIMS + 1
+  base_embedding_size =_COND_EMBEDDING_SIZE + _AMINO_ACID_EMBEDDING_DIMS + 1 + 3
   base_features = tf_keras.layers.concatenate(
       inputs=[cond, pemb, peptide_indx, z])
   transformer_output = _DecoderTransformer(
