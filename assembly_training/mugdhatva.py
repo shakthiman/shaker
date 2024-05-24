@@ -62,9 +62,9 @@ def main ():
     model=variational_model,
     optimizer=optimizer,
     save_frequency=1000,
-    write_target='gs://variational_shaker_models/assembly_based_model_prod_mugdhatva_simpler',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_mugdhatva_simpler',
-    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_mugdhatva_simpler',
+    write_target='gs://variational_shaker_models/assembly_based_model_prod_mugdhatva_skip_connection',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_model_prod_mugdhatva_skip_connection',
+    checkpoint_directory='gs://variational_shaker_models/checkpoints/assembly_based_model_prod_mugdhatva_skip_connection',
     strategy=strategy,
     beta_fn= lambda cpu_step: BetaAnneal(cpu_step),
     config={
