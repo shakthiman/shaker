@@ -265,7 +265,7 @@ def DecoderModel():
   transformer_output = tf.ensure_shape(
       transformer_output, [_BATCH_SIZE, _NUM_PEPTIDES, _ATOMS_PER_SEQUENCE, base_embedding_size])
   lstm_output = DecoderLSTM(64, _BATCH_SIZE)(transformer_output, tf.cast(atom_mask, tf.bool))
-  loc = tf_keras.layers.Dense(3)(lstm_output)
+  loc = tf_keras.layers.Dense(3)(tf.keras.layers.concatenate(inputs=[lstm_output, z]))
   fdl = FinalDecoderLayer(1.0)
   return tf_keras.Model(
       inputs=[z, atom_mask, cond],
