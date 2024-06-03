@@ -31,7 +31,9 @@ def main ():
           input_length=_INPUT_SIZE,
           num_blocks=_NUM_BLOCKS,
           pdb_vocab=v)
-  optimizer = optax.adam(1e-3)
+  optimizer = optax.chain(
+          optax.clip_by_global_norm(5e5),
+          optax.adam(1e-3))
   optimizer = optax.MultiSteps(optimizer, every_k_schedule=32)
   random_key, model_init_key = random.split(random_key, 2)
   (encoder_params, conditioner_params, decoder_params) = first_model.Init(
@@ -54,8 +56,8 @@ def main ():
     num_shards=8,
     pdb_vocab=v,
     random_key=random_key,
-    model_save_bucket='variational_shaker_models'
-    model_save_blob='assembly_based_jax_adi'
+    model_save_bucket='variational_shaker_models',
+    model_save_blob='assembly_based_jax_adi',
     tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi',
     encoder_model=encoder_model,
     conditioner=conditioner,
