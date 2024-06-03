@@ -88,9 +88,10 @@ def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, p
          decoder_params, opt_state, training_data)
     print('finish')
     step += 1
-    tf.summary.scalar('loss', loss_information.loss[0], step=step)
-    tf.summary.scalar('loss_beta_1', loss_information.loss_beta_1[0], step=step)
-    tf.summary.scalar('logpx_z', loss_information.logpx_z[0], step=step)
-    tf.summary.scalar('logpz', loss_information.logpz[0], step=step)
-    tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
-    tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
+    with summary_writer.as_default():
+      tf.summary.scalar('loss', loss_information.loss[0], step=step)
+      tf.summary.scalar('loss_beta_1', loss_information.loss_beta_1[0], step=step)
+      tf.summary.scalar('logpx_z', loss_information.logpx_z[0], step=step)
+      tf.summary.scalar('logpz', loss_information.logpz[0], step=step)
+      tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
+      tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
