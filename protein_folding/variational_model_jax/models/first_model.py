@@ -185,16 +185,16 @@ def ComputeLoss(random_key,
   log_prob_z_x = _LogNormalPdf(z, mean_z, logvar_z)
 
   log_prob_x_z = jnp.mean(
-      jnp.sum(log_prob_x_z*jp.expand_dims(mask, -1), axis=[1,2]), axis=0)
+      jnp.sum(log_prob_x_z*jnp.expand_dims(mask, -1), axis=[1,2]), axis=0)
   log_prob_z = jnp.mean(
-      jnp.sum(log_prob_z*jp.expand_dims(mask, -1), axis=[1,2]), axis=0)
+      jnp.sum(log_prob_z*jnp.expand_dims(mask, -1), axis=[1,2]), axis=0)
   log_prob_z_x = jnp.mean(
-      jnp.sum(log_prob_z_x*jp.expand_dims(mask, -1), axis=[1,2]), axis=0)
+      jnp.sum(log_prob_z_x*jnp.expand_dims(mask, -1), axis=[1,2]), axis=0)
 
   diff_mae = jnp.sum(
       jnp.absolute(
         mean_val-training_data['normalized_coordinates']) 
-      * jp.expand_dims(mask, -1))/jnp.sum(mask)
+      * jnp.expand_dims(mask, -1))/jnp.sum(mask)
 
   return loss_information.LossInformation(
       loss=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),

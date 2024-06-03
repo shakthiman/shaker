@@ -80,11 +80,13 @@ def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, p
     training_data = {k:v.numpy() for k,v in t.items()}
     random_key, loss_key = random.split(random_key, 2)
     loss_keys = random.split(loss_key, num=(num_shards,))
+    print('start')
     (loss_information,
      (encoder_params, conditioner_params, decoder_params),
      opt_state) = TrainStep(
          loss_keys, encoder_params, conditioner_params,
          decoder_params, opt_state, training_data)
+    print('finish')
     step += 1
     tf.summary.scalar('loss', loss_information.loss[0], step=step)
     tf.summary.scalar('loss_beta_1', loss_information.loss_beta_1[0], step=step)
