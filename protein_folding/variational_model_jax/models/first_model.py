@@ -246,7 +246,11 @@ def Init(random_key, encoder, decoder, conditioner, batch_size, input_length):
    z_key,
    mask_key,
    normalized_coordinates_key) = random.split(variables_key, 8)
-
+  num_conditioner_features = (
+      1 
+      + conditioner.amino_acid_embedding_dims
+      + conditioner.residue_embedding_dims
+      + conditioner.atom_embedding_dims)
   conditioning = random.normal(conditioning_key,
                                (batch_size, input_length, num_conditioner_features))
   normalized_coordinates = random.normal(normalized_coordinates_key, (batch_size, input_length, 3))
