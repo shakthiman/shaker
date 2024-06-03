@@ -93,7 +93,6 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
          loss_keys, encoder_params, conditioner_params,
          decoder_params, opt_state, training_data)
     print('finish')
-    step += 1
     if step % 100 == 0:
       with summary_writer.as_default():
         tf.summary.scalar('loss', loss_information.loss[0], step=step)
@@ -102,7 +101,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
         tf.summary.scalar('logpz', loss_information.logpz[0], step=step)
         tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
         tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
-        tf.summary.scalar('grad_norm', grad_norm, step=step)
+        tf.summary.scalar('grad_norm', grad_norm[0], step=step)
       model_loading.SaveModel(
               storage_client=storage_client,
               bucket_name=model_save_bucket,
@@ -110,3 +109,4 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
               encoder_params=flax.jax_utils.unreplicate(encoder_params),
               conditioner_params=flax.jax_utils.unreplicate(conditioner_params),
               decoder_params=flax.jax_utils.unreplicate(decoder_params))
+    step += 1
