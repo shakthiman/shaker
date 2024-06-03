@@ -2,10 +2,13 @@ import flax
 import functools
 import jax
 from jax import random
+from jax import numpy as jnp
 import optax
+import operator
 
 
 import tensorflow as tf
+from protein_folding.variational_model_jax import model_loading
 
 def Featurize(x, pdb_vocab):
   residue_names = pdb_vocab.GetResidueNamesId(x['resname'])
@@ -28,8 +31,8 @@ def Featurize(x, pdb_vocab):
     'normalized_coordinates': tf.reshape(normalized_coordinates, [-1, 3])
   }
 
-def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, pdb_vocab, random_key,
-          tensorboard_target, encoder_model, conditioner, decoder_model, optimizer, compute_loss_fn,
+def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, pdb_vocab, random_key,
+          model_save_bucket, model_save_blob, tensorboard_target, encoder_model, conditioner, decoder_model, optimizer, compute_loss_fn,
           encoder_params, conditioner_params, decoder_params, opt_state):
   def _LossFn(rk, ep, cp, dp, td):
     loss_information = compute_loss_fn(
@@ -54,7 +57,9 @@ def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, p
     updates, os = optimizer.update(mean_grad, os)
     (ep, cp, dp) = optax.apply_updates(
         (ep, cp, dp), updates)
+    grad_norm = jax.tree_util.tree_reduce(operator.add, jax.tree_util.tree_map(jnp.linalg.norm, mean_grad))
     return (jax.lax.pmean(loss_information, 'batch'),
+            grad_norm,
             (ep, cp, dp), os)
 
   encoder_params = flax.jax_utils.replicate(encoder_params)
@@ -82,16 +87,26 @@ def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, p
     loss_keys = random.split(loss_key, num=(num_shards,))
     print('start')
     (loss_information,
+     grad_norm,
      (encoder_params, conditioner_params, decoder_params),
      opt_state) = TrainStep(
          loss_keys, encoder_params, conditioner_params,
          decoder_params, opt_state, training_data)
     print('finish')
     step += 1
-    with summary_writer.as_default():
-      tf.summary.scalar('loss', loss_information.loss[0], step=step)
-      tf.summary.scalar('loss_beta_1', loss_information.loss_beta_1[0], step=step)
-      tf.summary.scalar('logpx_z', loss_information.logpx_z[0], step=step)
-      tf.summary.scalar('logpz', loss_information.logpz[0], step=step)
-      tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
-      tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
+    if step % 100 == 0:
+      with summary_writer.as_default():
+        tf.summary.scalar('loss', loss_information.loss[0], step=step)
+        tf.summary.scalar('loss_beta_1', loss_information.loss_beta_1[0], step=step)
+        tf.summary.scalar('logpx_z', loss_information.logpx_z[0], step=step)
+        tf.summary.scalar('logpz', loss_information.logpz[0], step=step)
+        tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
+        tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
+        tf.summary.scalar('grad_norm', grad_norm, step=step)
+      model_loading.SaveModel(
+              storage_client=storage_client,
+              bucket_name=model_save_bucket,
+              blob_name=model_save_blob+'/'+step,
+              encoder_params=flax.jax_utils.unreplicate(encoder_params),
+              conditioner_params=flax.jax_utils.unreplicate(conditioner_params),
+              decoder_params=flax.jax_utils.unreplicate(decoder_params))

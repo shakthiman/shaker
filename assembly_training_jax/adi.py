@@ -45,6 +45,7 @@ def main ():
 
   random_key, train_key = random.split(random_key, 2)
   model_trainer.Train(
+    storage_client=client,
     ds=ds,
     shuffle_size=10000,
     batch_size=_BATCH_SIZE,
@@ -53,6 +54,8 @@ def main ():
     num_shards=8,
     pdb_vocab=v,
     random_key=random_key,
+    model_save_bucket='variational_shaker_models'
+    model_save_blob='assembly_based_jax_adi'
     tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi',
     encoder_model=encoder_model,
     conditioner=conditioner,
