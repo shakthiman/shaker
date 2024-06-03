@@ -262,8 +262,8 @@ def Init(random_key, encoder, decoder, conditioner, batch_size, input_length):
   atom_names = random.randint(atom_names_key, (batch_size, input_length), 0, 10)
 
   encoder_key, conditioner_key, decoder_key = random.split(params_key, 3)
-  encoder_params = encoder_model.init(encoder_key, normalized_coordinates)
-  decoder_params = decoder_model.init(
+  encoder_params = encoder.init(encoder_key, normalized_coordinates)
+  decoder_params = decoder.init(
       decoder_key, conditioning, z, mask, normalized_coordinates,
       method=DecoderModule.log_prob_x)
   conditioner_params = conditioner.init(
