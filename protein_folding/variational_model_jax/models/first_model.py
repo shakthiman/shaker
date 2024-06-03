@@ -203,15 +203,15 @@ def ComputeLoss(random_key,
       logqz_x=log_prob_z_x,
       diff_mae=diff_mae)
 
-def GetModels(batch_size, input_length, num_blocks):
+def GetModels(batch_size, input_length, num_blocks, pdb_vocab):
   #Instantiate the Encoder, Decoder, and Conditioner
   encoder_model = EncoderModule(6.0)
   conditioner = ConditionerModule(
       amino_acid_embedding_dims=20,
       max_atom_indx=float(input_length),
-      residue_lookup_size=v.ResidueLookupSize(),
+      residue_lookup_size=pdb_vocab.ResidueLookupSize(),
       residue_embedding_dims=3,
-      atom_lookup_size=v.AtomLookupSize(),
+      atom_lookup_size=pdb_vocab.AtomLookupSize(),
       atom_embedding_dims=3)
   num_conditioner_features = (
       1 

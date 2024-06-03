@@ -29,7 +29,8 @@ def main ():
   (encoder_model, conditioner, decoder_model) = first_model.GetModels(
           batch_size=_BATCH_SIZE,
           input_length=_INPUT_SIZE,
-          num_blocks=_NUM_BLOCKS)
+          num_blocks=_NUM_BLOCKS,
+          pdb_vocab=v)
   optimizer = optax.adam(1e-3)
   optimizer = optax.MultiSteps(optimizer, every_k_schedule=32)
   random_key, model_init_key = random.split(random_key, 2)
