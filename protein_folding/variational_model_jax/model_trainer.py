@@ -102,6 +102,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
         tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
         tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
         tf.summary.scalar('grad_norm', grad_norm[0], step=step)
+    if step % 1000 == 0:
       model_loading.SaveModel(
               storage_client=storage_client,
               bucket_name=model_save_bucket,
