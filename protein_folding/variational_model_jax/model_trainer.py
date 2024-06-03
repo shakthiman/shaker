@@ -54,7 +54,7 @@ def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, p
     updates, os = optimizer.update(mean_grad, os)
     (ep, cp, dp) = optax.apply_updates(
         (ep, cp, dp), updates)
-    return (jax.lax.pmean(loss_information),
+    return (jax.lax.pmean(loss_information, 'batch'),
             (ep, cp, dp), os)
 
   encoder_params = flax.jax_utils.replicate(encoder_params)
