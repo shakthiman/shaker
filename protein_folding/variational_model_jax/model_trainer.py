@@ -76,7 +76,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
             'residue_names': [input_size],
             'atom_names': [input_size],
             'normalized_coordinates': [input_size, 3]
-            }).batch(num_shards)
+            }).batch(num_shards).prefetch(prefetch_size)
 
   summary_writer = tf.summary.create_file_writer(
           tensorboard_target, max_queue=10000, flush_millis=600000)
