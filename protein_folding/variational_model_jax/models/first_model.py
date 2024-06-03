@@ -200,6 +200,7 @@ def ComputeLoss(random_key,
       loss=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
       loss_beta_1=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
       logpx_z= log_prob_x_z,
+      logpz = log_prob_z,
       logqz_x=log_prob_z_x,
       diff_mae=diff_mae)
 
