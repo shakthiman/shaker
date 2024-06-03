@@ -40,7 +40,7 @@ def Train(ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, p
         encoder_params=ep,
         conditioner_params=cp,
         decoder_params=dp,
-        td)
+        training_data=td)
     return (loss_information.loss, loss_information)
 
   loss_and_grad_fn = jax.value_and_grad(
