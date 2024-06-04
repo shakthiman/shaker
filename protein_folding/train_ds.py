@@ -6,14 +6,14 @@ from protein_folding import training_example
 
 def _IgnoreCondition(x):
   peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'], fn_output_signature=tf.int32)
+  num_peptides = tf.shape(peptide_shapes)
+  atoms_per_peptide = tf.math.reduce_max(peptide_shapes)
   return tf.math.reduce_any(
           tf.stack([
             # Hack to ignore sequences with RNA.
             tf.math.equal(tf.math.reduce_min(peptide_shapes), 0),
-            # Too many peptides.
-            tf.math.greater(tf.shape(peptide_shapes)[0], 4),
             # Too many atoms
-            tf.math.greater(tf.math.reduce_max(peptide_shapes), 6000)]))
+            tf.math.greater(num_peptides * atoms_per_peptide, 24000)]))
 
 def _PrepareTFDataset(filenames, files_to_take=1):
   return (
