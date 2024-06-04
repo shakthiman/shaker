@@ -66,7 +66,7 @@ def main ():
     random_key=random_key,
     model_save_bucket='variational_shaker_models',
     model_save_blob='assembly_based_jax_adi_reduced_saving2',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving2',
     encoder_model=encoder_model,
     conditioner=conditioner,
     decoder_model=decoder_model,
