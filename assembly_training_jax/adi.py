@@ -48,7 +48,7 @@ def main ():
   encoder_params, conditioner_params, decoder_params = model_loading.LoadModel(
           storage_client=client,
           bucket_name='variational_shaker_models',
-          blob_name='assembly_based_jax_adi_reduced_saving/9000',
+          blob_name='assembly_based_jax_adi_reduced_saving/25000',
           encoder_params=encoder_params,
           conditioner_params=conditioner_params,
           decoder_params=decoder_params)

@@ -25,4 +25,4 @@ def LoadModel(storage_client, bucket_name, blob_name, encoder_params, conditione
   return (
       _DownloadParams(bucket, blob_name + '/encoder', encoder_params),
       _DownloadParams(bucket, blob_name + '/conditioner', conditioner_params),
-      _DownloadParams(bucket, blob_name + '/decoder_params', decoder_params))
+      _DownloadParams(bucket, blob_name + '/decoder', decoder_params))
