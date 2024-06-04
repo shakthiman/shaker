@@ -31,9 +31,11 @@ def Featurize(x, pdb_vocab):
     'normalized_coordinates': tf.reshape(normalized_coordinates, [-1, 3])
   }
 
-def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_size, num_shards, pdb_vocab, random_key,
-          model_save_bucket, model_save_blob, tensorboard_target, encoder_model, conditioner, decoder_model, optimizer, compute_loss_fn,
-          encoder_params, conditioner_params, decoder_params, opt_state):
+def Train(storage_client, ds, shuffle_size, batch_size, input_size,
+          prefetch_size, num_shards, pdb_vocab, random_key, model_save_bucket,
+          model_save_blob, tensorboard_target, encoder_model, conditioner,
+          decoder_model, optimizer, compute_loss_fn, encoder_params,
+          conditioner_params, decoder_params, opt_state, step=0):
   def _LossFn(rk, ep, cp, dp, td):
     loss_information = compute_loss_fn(
         random_key=rk,
@@ -80,7 +82,6 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
 
   summary_writer = tf.summary.create_file_writer(
           tensorboard_target, max_queue=10000, flush_millis=600000)
-  step = 0
   for t in tds:
     training_data = {k:v.numpy() for k,v in t.items()}
     random_key, loss_key = random.split(random_key, 2)

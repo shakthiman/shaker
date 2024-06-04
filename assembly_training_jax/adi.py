@@ -75,7 +75,8 @@ def main ():
     encoder_params=encoder_params,
     conditioner_params=conditioner_params,
     decoder_params=decoder_params,
-    opt_state=opt_state)
+    opt_state=opt_state,
+    step=9000)
 
 if __name__ == "__main__":
   main()
