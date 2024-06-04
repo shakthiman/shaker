@@ -109,5 +109,6 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size, prefetch_siz
               blob_name=model_save_blob+'/'+str(step),
               encoder_params=flax.jax_utils.unreplicate(encoder_params),
               conditioner_params=flax.jax_utils.unreplicate(conditioner_params),
-              decoder_params=flax.jax_utils.unreplicate(decoder_params))
+              decoder_params=flax.jax_utils.unreplicate(decoder_params),
+              opt_state=flax.jax_utils.unreplicate(opt_state))
     step += 1

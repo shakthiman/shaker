@@ -5,6 +5,7 @@ from protein_folding import pdb_vocab
 from protein_folding import train_ds
 from protein_folding.variational_model_jax import model_trainer
 from protein_folding.variational_model_jax.models import first_model
+from protein_folding.variational_model_jax import model_loading
 
 from google.cloud import storage
 import optax
@@ -44,6 +45,13 @@ def main ():
           batch_size=_BATCH_SIZE,
           input_length=_INPUT_SIZE)
   opt_state = optimizer.init((encoder_params, conditioner_params, decoder_params))
+  encoder_params, conditioner_params, decoder_params = model_loading.LoadModel(
+          storage_client=client,
+          bucket_name='variational_shaker_models',
+          blob_name='assembly_based_jax_adi_reduced_saving/9000',
+          encoder_params=encoder_params,
+          conditioner_params=conditioner_params,
+          decoder_params=decoder_params)
 
   random_key, train_key = random.split(random_key, 2)
   model_trainer.Train(
@@ -57,7 +65,7 @@ def main ():
     pdb_vocab=v,
     random_key=random_key,
     model_save_bucket='variational_shaker_models',
-    model_save_blob='assembly_based_jax_adi_reduced_saving',
+    model_save_blob='assembly_based_jax_adi_reduced_saving2',
     tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving',
     encoder_model=encoder_model,
     conditioner=conditioner,
