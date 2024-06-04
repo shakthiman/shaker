@@ -6,7 +6,7 @@ from protein_folding import training_example
 
 def _IgnoreCondition(x):
   peptide_shapes = tf.map_fn(lambda y: tf.shape(y)[0], x['resname'], fn_output_signature=tf.int32)
-  num_peptides = tf.shape(peptide_shapes)
+  num_peptides = tf.shape(peptide_shapes)[0]
   atoms_per_peptide = tf.math.reduce_max(peptide_shapes)
   return tf.math.reduce_any(
           tf.stack([
