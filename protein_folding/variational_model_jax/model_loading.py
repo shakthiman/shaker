@@ -26,3 +26,7 @@ def LoadModel(storage_client, bucket_name, blob_name, encoder_params, conditione
       _DownloadParams(bucket, blob_name + '/encoder', encoder_params),
       _DownloadParams(bucket, blob_name + '/conditioner', conditioner_params),
       _DownloadParams(bucket, blob_name + '/decoder', decoder_params))
+
+def LoadOptimizer(storage_client, bucket_name, blob_name, opt_state):
+  bucket = storage_client.bucket(bucket_name)
+  return _DownloadParams(bucket, blob_name + '/opt_state', opt_state)
