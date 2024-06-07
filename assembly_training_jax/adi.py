@@ -49,14 +49,14 @@ def main ():
   encoder_params, conditioner_params, decoder_params = model_loading.LoadModel(
           storage_client=client,
           bucket_name='variational_shaker_models',
-          blob_name='assembly_based_jax_adi_reduced_saving3/108000',
+          blob_name='assembly_based_jax_adi_reduced_saving4/153000',
           encoder_params=encoder_params,
           conditioner_params=conditioner_params,
           decoder_params=decoder_params)
   opt_state = model_loading.LoadOptimizer(
           storage_client=client,
           bucket_name='variational_shaker_models',
-          blob_name='assembly_based_jax_adi_reduced_saving3/108000',
+          blob_name='assembly_based_jax_adi_reduced_saving4/153000',
           opt_state=opt_state)
 
   random_key, train_key = random.split(random_key, 2)
@@ -71,8 +71,8 @@ def main ():
     pdb_vocab=v,
     random_key=random_key,
     model_save_bucket='variational_shaker_models',
-    model_save_blob='assembly_based_jax_adi_reduced_saving4',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving4',
+    model_save_blob='assembly_based_jax_adi_reduced_saving5',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving5',
     encoder_model=encoder_model,
     conditioner=conditioner,
     decoder_model=decoder_model,
@@ -82,7 +82,7 @@ def main ():
     conditioner_params=conditioner_params,
     decoder_params=decoder_params,
     opt_state=opt_state,
-    step=108000)
+    step=153000)
 
 if __name__ == "__main__":
   main()
