@@ -82,7 +82,7 @@ def main ():
     conditioner_params=conditioner_params,
     decoder_params=decoder_params,
     opt_state=opt_state,
-    step=153000)
+    step=177000)
 
 if __name__ == "__main__":
   main()
