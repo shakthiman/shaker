@@ -26,7 +26,7 @@ def main ():
                               cluster_shuffle_size=1000,
                               cluster_cycle_length=1000)
 
-  random_key = random.key(6)
+  random_key = random.key(7)
   (encoder_model, conditioner, decoder_model) = first_model.GetModels(
           batch_size=_BATCH_SIZE,
           input_length=_INPUT_SIZE,
@@ -49,14 +49,14 @@ def main ():
   encoder_params, conditioner_params, decoder_params = model_loading.LoadModel(
           storage_client=client,
           bucket_name='variational_shaker_models',
-          blob_name='assembly_based_jax_adi_reduced_saving7/273000',
+          blob_name='assembly_based_jax_adi_reduced_saving8/320000',
           encoder_params=encoder_params,
           conditioner_params=conditioner_params,
           decoder_params=decoder_params)
   opt_state = model_loading.LoadOptimizer(
           storage_client=client,
           bucket_name='variational_shaker_models',
-          blob_name='assembly_based_jax_adi_reduced_saving7/273000',
+          blob_name='assembly_based_jax_adi_reduced_saving8/320000',
           opt_state=opt_state)
 
   random_key, train_key = random.split(random_key, 2)
@@ -71,8 +71,8 @@ def main ():
     pdb_vocab=v,
     random_key=random_key,
     model_save_bucket='variational_shaker_models',
-    model_save_blob='assembly_based_jax_adi_reduced_saving8',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving8',
+    model_save_blob='assembly_based_jax_adi_reduced_saving9',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_adi_reduced_saving9',
     encoder_model=encoder_model,
     conditioner=conditioner,
     decoder_model=decoder_model,
