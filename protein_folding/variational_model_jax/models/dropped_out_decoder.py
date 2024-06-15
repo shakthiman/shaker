@@ -20,7 +20,7 @@ class VAE(nn.Module):
     z = eps * jnp.exp(logvar_z * 0.5) + mean_z
 
     mask = shared_utils.Mask(training_data)
-    mean_val, log_prob_x_z = self.decoder_model.log_prob_x_z(
+    mean_val, log_prob_x_z = self.decoder_model.log_prob_x(
         conditioning, z, mask, training_data['normalized_coordinates'])
     log_prob_z = shared_utils.LogNormalPdf(z, 0, 0)
     log_prob_z_x = shared_utils.LogNormalPdf(z, mean_z, logvar_z)
