@@ -53,7 +53,7 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab):
       + conditioner.amino_acid_embedding_dims
       + conditioner.residue_embedding_dims
       + conditioner.atom_embedding_dims)
-  decoder_model = DecoderModule(
+  decoder_model = first_model.DecoderModule(
       transformers=[shared_modules.EfficientTransformerUnit(
         num_blocks=num_blocks,
         input_length=input_length,
