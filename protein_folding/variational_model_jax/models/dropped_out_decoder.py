@@ -90,7 +90,7 @@ def Init(random_key, vae, batch_size, input_length):
   atom_names = random.randint(atom_names_key, (batch_size, input_length), 0, 10)
   normalized_coordinates = random.normal(normalized_coordinates_key, (batch_size, input_length, 3))
 
-  return vae.Init(
+  return vae.init(
       params_key, {
         'peptide_indices': peptide_indices,
         'atom_indices': atom_indices,
