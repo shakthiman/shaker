@@ -8,7 +8,10 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
           model_save_blob, tensorboard_target, vae, optimizer, vae_params,
           opt_state, step=0):
   def _LossFn(vae_params, random_key, training_data):
-    loss_information = vae.compute_model_loss(random_key, training_data)
+    loss_information = vae.apply(
+            vae_params, random_key, training_data,
+            method=vae.compute_model_loss,
+            deterministic=False)
     return (loss_information.loss, loss_information)
 
   loss_and_grad_fn = jax.value_and_grad(
