@@ -61,7 +61,7 @@ class EfficientTransformerUnit(nn.Module):
         + jnp.reshape(
           global_self_attention,
           [self.batch_size, self.input_length, -1]))
-    if dropout_fraction:
+    if self.dropout_fraction:
       attention_values = self.dropout_layer(attention_values)
     attention_values = (inputs + attention_values)
     attention_values = self.attention_layer_norm(attention_values)
