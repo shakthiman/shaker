@@ -1,3 +1,4 @@
+from jax import numpy as jnp
 def Mask(training_data):
   return jnp.any(training_data['normalized_coordinates']!=0, axis=-1)
 
