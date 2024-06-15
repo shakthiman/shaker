@@ -3,9 +3,10 @@ import functools
 import jax
 import optax
 
-def Train(vae, optimizer, vae_params, pdb_vocab, opt_state, ds,
-          tensorboard_target,
-          shuffle_size, batch_size, prefetch_size, input_size, num_shards, step=0):
+def Train(storage_client, ds, shuffle_size, batch_size, input_size,
+          prefetch_size, num_shards, pdb_vocab, random_key, model_save_bucket,
+          model_save_blob, tensorboard_target, vae, optimizer, vae_params,
+          opt_state, step=0):
   def _LossFn(vae_params, random_key, training_data):
     loss_information = vae.compute_model_loss(random_key, training_data)
     return (loss_information.loss, loss_information)
