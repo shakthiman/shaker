@@ -59,8 +59,8 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab):
         num_blocks=num_blocks,
         input_length=input_length,
         batch_size=batch_size,
-        local_transformer=nn.MultiHeadAttention(num_heads=100, qkv_features=num_conditioner_features),
-        global_transformer=nn.MultiHeadAttention(num_heads=100, qkv_features=num_conditioner_features),
+        local_transformer=nn.MultiHeadAttention(num_heads=100, qkv_features=num_conditioner_features*num_heads),
+        global_transformer=nn.MultiHeadAttention(num_heads=100, qkv_features=num_conditioner_features*num_heads),
         feedforward_network=shared_modules.DNN(
             dnn_layers=[nn.Dense(100) for i in range(5)],
             activation_function = nn.gelu
