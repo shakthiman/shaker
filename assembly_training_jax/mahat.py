@@ -58,14 +58,9 @@ def main ():
     model_save_bucket='variational_shaker_models',
     model_save_blob='assembly_based_jax_mahat',
     tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_mahat',
-    encoder_model=encoder_model,
-    conditioner=conditioner,
-    decoder_model=decoder_model,
+    vae=vae,
     optimizer=optimizer,
-    compute_loss_fn=first_model.ComputeLoss,
-    encoder_params=encoder_params,
-    conditioner_params=conditioner_params,
-    decoder_params=decoder_params,
+    vae_params=vae_params,
     opt_state=opt_state,
     step=0)
 
