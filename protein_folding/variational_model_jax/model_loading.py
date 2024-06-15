@@ -20,6 +20,11 @@ def SaveModel(storage_client, bucket_name, blob_name, encoder_params, conditione
   _UploadParams(bucket, blob_name + "/decoder", decoder_params)
   _UploadParams(bucket, blob_name + "/opt_state", opt_state)
 
+def SaveModelV2(storage_client, bucket_name, blob_name, vae_params, opt_state):
+  bucket = storage_client.bucket(bucket_name)
+  _UploadParams(bucket, blob_name + "/vae_params", vae_params)
+  _UploadParams(bucket, blob_name + "/opt_state", opt_state)
+
 def LoadModel(storage_client, bucket_name, blob_name, encoder_params, conditioner_params, decoder_params):
   bucket = storage_client.bucket(bucket_name)
   return (
