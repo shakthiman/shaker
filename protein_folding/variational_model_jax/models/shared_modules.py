@@ -23,6 +23,7 @@ class EfficientTransformerUnit(nn.Module):
   feedforward_network: DNN
   final_layer: nn.Dense
   dropout_fraction: typing.Optional[float] = None
+  deterministic: bool = True
 
   def setup(self):
     assert self.input_length % self.num_blocks == 0
@@ -31,14 +32,16 @@ class EfficientTransformerUnit(nn.Module):
     self.feedforward_layer_norm = nn.LayerNorm(reduction_axes=[-2,-1],
                                                feature_axes=[-2,-1])
     if self.dropout_fraction:
-      self.dropout_layer = nn.Dropout(self.dropout_fraction)
+      self.dropout_layer = nn.Dropout(self.dropout_fraction,
+                                      deterministic=deterministic,
+                                      broadcast_dims=(-1,))
 
   def _get_mask(self, mask):
     attention_mask = jnp.logical_and(jnp.expand_dims(mask, -1),
                                      jnp.expand_dims(mask, -2))
     return jnp.expand_dims(attention_mask, -3)
 
-  def __call__(self, inputs, mask, deterministic=True):
+  def __call__(self, inputs, mask):
     reshaped_inputs = jnp.reshape(
         inputs, [self.batch_size, self.num_blocks,
                  self.input_length//self.num_blocks, -1])
@@ -63,7 +66,7 @@ class EfficientTransformerUnit(nn.Module):
           [self.batch_size, self.input_length, -1]))
     if self.dropout_fraction:
       attention_values = self.dropout_layer(
-              attention_values, deterministic=deterministic)
+              attention_values)
     attention_values = (inputs + attention_values)
     attention_values = self.attention_layer_norm(attention_values)
 

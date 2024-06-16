@@ -32,7 +32,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
           opt_state, step=0):
   def _LossFn(vae_params, random_key, training_data):
     loss_information = vae.apply(
-            vae_params, random_key, training_data, False,
+            vae_params, random_key, training_data,
             method=vae.compute_model_loss)
     return (loss_information.loss, loss_information)
 

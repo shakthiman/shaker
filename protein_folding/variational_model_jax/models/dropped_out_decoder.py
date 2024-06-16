@@ -15,7 +15,7 @@ class VAE(nn.Module):
   conditioner_model: first_model.ConditionerModule
 
   def compute_model_loss(
-      self, random_key, training_data, deterministic):
+      self, random_key, training_data):
     conditioning = self.conditioner_model(training_data)
     mean_z, logvar_z = self.encoder_model(training_data)
     eps = random.normal(random_key, shape=jnp.shape(mean_z))
@@ -23,8 +23,7 @@ class VAE(nn.Module):
 
     mask = shared_utils.Mask(training_data)
     mean_val, log_prob_x_z = self.decoder_model.log_prob_x(
-        conditioning, z, mask, training_data['normalized_coordinates'],
-        deterministic=deterministic)
+        conditioning, z, mask, training_data['normalized_coordinates'])
     log_prob_z = shared_utils.LogNormalPdf(z, 0, 0)
     log_prob_z_x = shared_utils.LogNormalPdf(z, mean_z, logvar_z)
 
@@ -45,7 +44,7 @@ class VAE(nn.Module):
             logqz_x=log_prob_z_x,
             diff_mae=diff_mae)
 
-def GetModel(batch_size, input_length, num_blocks, pdb_vocab):
+def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
   #Instantiate the Encoder, Decoder, and Conditioner
   encoder_model = first_model.EncoderModule(6.0)
   conditioner = first_model.ConditionerModule(
@@ -104,5 +103,5 @@ def Init(random_key, vae, batch_size, input_length):
         'residue_names': residue_names,
         'atom_names': atom_names,
         'normalized_coordinates': normalized_coordinates
-        }, False,
+        },
       method=VAE.compute_model_loss)

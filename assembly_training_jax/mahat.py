@@ -31,7 +31,8 @@ def main ():
           batch_size=_BATCH_SIZE,
           input_length=_INPUT_SIZE,
           num_blocks=_NUM_BLOCKS,
-          pdb_vocab=v)
+          pdb_vocab=v,
+          deterministic=False)
   optimizer = optax.chain(
           optax.clip_by_global_norm(5e5),
           optax.adam(1e-3))

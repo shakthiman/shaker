@@ -42,19 +42,16 @@ class DecoderModule(nn.Module):
                             [])
 
   def log_prob_x(self, conditioning, latent_embeddings, mask,
-                 normalized_coordinates, deterministic):
-    mean_val = self.mean_prediction(conditioning, latent_embeddings, mask,
-                                    deterministic=deterministic)
+                 normalized_coordinates):
+    mean_val = self.mean_prediction(conditioning, latent_embeddings, mask)
     return (mean_val,
             jscipy.stats.norm.logpdf(
                 normalized_coordinates, mean_val, self.scale))
 
-  def mean_prediction(self, conditioning, latent_embeddings, mask,
-                      deterministic):
+  def mean_prediction(self, conditioning, latent_embeddings, mask):
     o = conditioning
     for t in self.transformers:
-      o = t(jnp.concatenate([o, latent_embeddings], axis=-1), mask,
-            deterministic=deterministic)
+      o = t(jnp.concatenate([o, latent_embeddings], axis=-1), mask)
     return self.final_layer(
         jnp.concatenate([o, latent_embeddings], axis=-1))
 
