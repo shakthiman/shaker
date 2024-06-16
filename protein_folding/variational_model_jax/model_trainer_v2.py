@@ -7,6 +7,8 @@ import operator
 import optax
 import tensorflow as tf
 
+from protein_folding.variational_model_jax import model_loading
+
 def Featurize(x, pdb_vocab):
   residue_names = pdb_vocab.GetResidueNamesId(x['resname'])
   atom_names = pdb_vocab.GetAtomNamesId(x['atom_name'])
