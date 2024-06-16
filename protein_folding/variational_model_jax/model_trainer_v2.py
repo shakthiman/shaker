@@ -2,6 +2,28 @@ import flax
 import functools
 import jax
 import optax
+import tensorflow as tf
+
+def Featurize(x, pdb_vocab):
+  residue_names = pdb_vocab.GetResidueNamesId(x['resname'])
+  atom_names = pdb_vocab.GetAtomNamesId(x['atom_name'])
+  normalized_coordinates = x['atom_coords']
+
+  residue_names = residue_names.to_tensor()
+  atom_names = atom_names.to_tensor()
+  normalized_coordinates = normalized_coordinates.to_tensor()
+
+  peptide_indx = tf.expand_dims(tf.range(tf.shape(residue_names)[0], dtype=tf.int64), -1) * tf.ones_like(residue_names)
+  atom_indx = tf.expand_dims(tf.range(tf.shape(residue_names)[1], dtype=tf.int64), 0) * tf.ones_like(residue_names)
+
+  return {
+    #'structure_id': x['structure_id'],
+    'peptide_indices': tf.reshape(peptide_indx, [-1]),
+    'atom_indices': tf.reshape(atom_indx, [-1]),
+    'residue_names': tf.reshape(residue_names, [-1]),
+    'atom_names': tf.reshape(atom_names, [-1]),
+    'normalized_coordinates': tf.reshape(normalized_coordinates, [-1, 3])
+  }
 
 def Train(storage_client, ds, shuffle_size, batch_size, input_size,
           prefetch_size, num_shards, pdb_vocab, random_key, model_save_bucket,
