@@ -33,7 +33,7 @@ class EfficientTransformerUnit(nn.Module):
                                                feature_axes=[-2,-1])
     if self.dropout_fraction:
       self.dropout_layer = nn.Dropout(self.dropout_fraction,
-                                      deterministic=deterministic,
+                                      deterministic=self.deterministic,
                                       broadcast_dims=(-1,))
 
   def _get_mask(self, mask):
