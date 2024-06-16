@@ -84,6 +84,13 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
         tf.summary.scalar('logpz', loss_information.logpz[0], step=step)
         tf.summary.scalar('logqz_x', loss_information.logqz_x[0], step=step)
         tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
+        tf.summary.scalar('loss_alpha_carbon_clash',
+                          loss_information.loss_alpha_carbon_clash[0],
+                          step=step)
+        tf.summary.scalar('num_hard_clashes',
+                          loss_information.num_hard_clashes[0], step=step)
+        tf.summary.scalar('num_soft_clashes',
+                          loss_information.num_soft_clashes[0], step=step)
         tf.summary.scalar('grad_norm', grad_norm[0], step=step)
     if step % 1000 == 0:
       model_loading.SaveModelV2(

@@ -32,7 +32,8 @@ def main ():
           input_length=_INPUT_SIZE,
           num_blocks=_NUM_BLOCKS,
           pdb_vocab=v,
-          deterministic=False)
+          deterministic=False,
+          alpha_carbon=v.GetAtomNamesId(tf.constant('CA')).numpy())
   optimizer = optax.chain(
           optax.clip_by_global_norm(5e5),
           optax.adam(1e-3))

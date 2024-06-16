@@ -8,11 +8,17 @@ from flax import linen as nn
 
 from jax import numpy as jnp
 from jax import random
+import jax
 
 class VAE(nn.Module):
   encoder_model: first_model.EncoderModule
   decoder_model: first_model.DecoderModule
   conditioner_model: first_model.ConditionerModule
+  batch_size: int
+  input_length: int
+  nearby_size: int
+  alpha_carbon: int
+  alpha_carbon_clash_weight: float
 
   def compute_model_loss(
       self, random_key, training_data):
@@ -36,15 +42,54 @@ class VAE(nn.Module):
     diff_mae = shared_utils.DiffMAE(mean_val=mean_val,
                                     training_data=training_data,
                                     mask=mask)
-    return loss_information.LossInformation(
-            loss=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
+    nearby_pairs = jnp.reshape(mean_val,
+                               [self.batch_size,
+                                self.input_length//self.nearby_size,
+                                self.nearby_size, 3])
+    nearby_pairs = jnp.linalg.norm(
+        jnp.expand_dims(nearby_pairs, -3) - jnp.expand_dims(nearby_pairs, -2),
+        axis=-1)
+    nearby_mask = jnp.reshape(mask,
+                              [self.batch_size,
+                               self.input_length//self.nearby_size,
+                               self.nearby_size])
+    is_alpha_carbon = jnp.reshape(
+        jnp.equal(training_data['atom_names'], self.alpha_carbon),
+        [self.batch_size,
+         self.input_length//self.nearby_size,
+         self.nearby_size])
+    nearby_mask = jnp.logical_and(nearby_mask, is_alpha_carbon)
+
+    nearby_mask = jnp.logical_and(
+        jnp.expand_dims(nearby_mask, -1),
+        jnp.expand_dims(nearby_mask, -2))
+
+    num_hard_clashes = jnp.sum(
+        jnp.less_equal(nearby_pairs, 3.5) * nearby_mask,
+        axis=(1, 2, 3))
+    num_soft_clashes = jpn.sum(jax.nn.sigmoid(
+        20*(3.5 - nearby_pairs) * nearby_mask), axis=(1, 2, 3))
+
+    num_hard_clashes = jnp.mean(
+        num_hard_clashes, axis=0)
+    num_soft_clashes = jnp.mean(
+        num_soft_clashes, axis=0)
+    
+    loss_alpha_carbon_clash = self.alpha_carbon_clash_weight*num_soft_clashes
+    return loss_information.CreateLossInformation(
+            loss=(-1*(log_prob_x_z + log_prob_z - log_prob_z_x)
+                  + loss_alpha_carbon_clash),
             loss_beta_1=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
             logpx_z= log_prob_x_z,
             logpz = log_prob_z,
             logqz_x=log_prob_z_x,
-            diff_mae=diff_mae)
+            diff_mae=diff_mae,
+            loss_alpha_carbon_clash=loss_alpha_carbon_clash,
+            num_hard_clashes=num_hard_clashes,
+            num_soft_clashes=num_soft_clashes)
 
-def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
+def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
+             alpha_carbon):
   #Instantiate the Encoder, Decoder, and Conditioner
   encoder_model = first_model.EncoderModule(6.0)
   conditioner = first_model.ConditionerModule(
@@ -79,7 +124,12 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
   return VAE(
       encoder_model=encoder_model,
       conditioner_model=conditioner,
-      decoder_model=decoder_model)
+      decoder_model=decoder_model,
+      batch_size=batch_size,
+      input_length=input_length,
+      nearby_size=num_blocks,
+      alpha_carbon=alpha_carbon,
+      alpha_carbon_clash_weight=1e4)
 
 def Init(random_key, vae, batch_size, input_length):
   random_key, variables_key = random.split(random_key, 2)
