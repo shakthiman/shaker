@@ -51,6 +51,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
             grad_norm, vae_params, opt_state)
   
   vae_params = flax.jax_utils.replicate(vae_params)
+  opt_state = flax.jax_utils.replicate(opt_state)
   tds = ds.shuffle(shuffle_size).map(
       lambda x: Featurize(x, pdb_vocab)).padded_batch(
           batch_size,
@@ -81,12 +82,10 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
         tf.summary.scalar('diff_mae', loss_information.diff_mae[0], step=step)
         tf.summary.scalar('grad_norm', grad_norm[0], step=step)
     if step % 1000 == 0:
-      model_loading.SaveModel(
+      model_loading.SaveModelV2(
               storage_client=storage_client,
               bucket_name=model_save_bucket,
               blob_name=model_save_blob+'/'+str(step),
-              encoder_params=flax.jax_utils.unreplicate(encoder_params),
-              conditioner_params=flax.jax_utils.unreplicate(conditioner_params),
-              decoder_params=flax.jax_utils.unreplicate(decoder_params),
+              vae_params=flax.jax_utils.unreplicate(vae_params),
               opt_state=flax.jax_utils.unreplicate(opt_state))
     step += 1
