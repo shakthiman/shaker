@@ -10,9 +10,9 @@ from protein_folding.variational_model_jax import model_loading
 from google.cloud import storage
 import optax
 
-_INPUT_SIZE = 24000
-_BATCH_SIZE = 2
-_NUM_BLOCKS = 20
+_INPUT_SIZE = 32768
+_BATCH_SIZE = 1
+_NUM_BLOCKS = 128
 
 def main ():
   client = storage.Client()

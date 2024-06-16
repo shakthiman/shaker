@@ -51,9 +51,9 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
       amino_acid_embedding_dims=20,
       max_atom_indx=float(input_length),
       residue_lookup_size=pdb_vocab.ResidueLookupSize(),
-      residue_embedding_dims=3,
+      residue_embedding_dims=4,
       atom_lookup_size=pdb_vocab.AtomLookupSize(),
-      atom_embedding_dims=3)
+      atom_embedding_dims=4)
   num_conditioner_features = (
       1 
       + conditioner.amino_acid_embedding_dims
@@ -64,7 +64,8 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
         num_blocks=num_blocks,
         input_length=input_length,
         batch_size=batch_size,
-        transformer1=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
+        conv1=nn.Conv(features=num_conditioner_features+3,
+                      kernel_size=3),
         transformer2=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
         transformer3=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
         feedforward_network=shared_modules.DNN(

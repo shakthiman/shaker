@@ -78,7 +78,7 @@ class EfficientTransformerUnit3(nn.Module):
   num_blocks: int
   input_length: int
   batch_size: int
-  transformer1: nn.MultiHeadAttention
+  conv1: nn.Conv
   transformer2: nn.MultiHeadAttention
   transformer3: nn.MultiHeadAttention
   feedforward_network: DNN
@@ -109,18 +109,17 @@ class EfficientTransformerUnit3(nn.Module):
     reshaped_mask = jnp.reshape(
         mask, [self.batch_size, self.num_blocks, self.num_blocks,
                self.input_length//self.num_blocks//self.num_blocks])
-    attention1  = self.transformer1(
-        reshaped_inputs, mask=self._get_mask(reshaped_mask))
+    attention1  = self.conv1(inputs)
     attention2 = jnp.transpose(self.transformer2(
-      jnp.transpose(reshaped_inputs, axes=[0,3,2,1,4]),
-      mask=self._get_mask(
-        jnp.transpose(reshaped_mask, axes=[0,3,2,1]))),
-      axes=[0,3,2,1,4])
-    attention3 = jnp.transpose(self.transformer3(
       jnp.transpose(reshaped_inputs, axes=[0,1,3,2,4]),
       mask=self._get_mask(
         jnp.transpose(reshaped_mask, axes=[0,1,3,2]))),
       axes=[0,1,3,2,4])
+    attention3 = jnp.transpose(self.transformer3(
+      jnp.transpose(reshaped_inputs, axes=[0,3,2,1,4]),
+      mask=self._get_mask(
+        jnp.transpose(reshaped_mask, axes=[0,3,2,1]))),
+      axes=[0,3,2,1,4])
 
     attention_values = (
         jnp.reshape(
