@@ -44,7 +44,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
     (loss, loss_information), grads = loss_and_grad_fn(
         vae_params, random_key, training_data)
     mean_grad = jax.lax.pmean(grads, 'batch')
-    updates, opt_state = optimizer.update(mean_grad, opt_state)
+    updates, opt_state = optimizer.update(mean_grad, opt_state, vae_params)
     vae_params = optax.apply_updates(vae_params, updates)
     grad_norm = jax.tree_util.tree_reduce(operator.add, jax.tree_util.tree_map(jnp.linalg.norm, mean_grad))
     return (jax.lax.pmean(loss_information, 'batch'),
