@@ -1,3 +1,5 @@
+from protein_folding.variational_model_jax import loss_information
+
 from protein_folding.variational_model_jax.models import first_model
 from protein_folding.variational_model_jax.models import shared_modules
 from protein_folding.variational_model_jax.models import shared_utils
