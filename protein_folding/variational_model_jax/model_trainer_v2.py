@@ -1,6 +1,7 @@
 import flax
 import functools
 import jax
+from jax import random
 import optax
 import tensorflow as tf
 
