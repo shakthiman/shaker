@@ -99,5 +99,5 @@ def Init(random_key, vae, batch_size, input_length):
         'residue_names': residue_names,
         'atom_names': atom_names,
         'normalized_coordinates': normalized_coordinates
-        },
+        }, False,
       method=VAE.compute_model_loss)
