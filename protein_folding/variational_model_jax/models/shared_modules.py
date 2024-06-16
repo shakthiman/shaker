@@ -38,7 +38,7 @@ class EfficientTransformerUnit(nn.Module):
                                      jnp.expand_dims(mask, -2))
     return jnp.expand_dims(attention_mask, -3)
 
-  def __call__(self, inputs, mask):
+  def __call__(self, inputs, mask, deterministic=True):
     reshaped_inputs = jnp.reshape(
         inputs, [self.batch_size, self.num_blocks,
                  self.input_length//self.num_blocks, -1])
@@ -62,7 +62,8 @@ class EfficientTransformerUnit(nn.Module):
           global_self_attention,
           [self.batch_size, self.input_length, -1]))
     if self.dropout_fraction:
-      attention_values = self.dropout_layer(attention_values)
+      attention_values = self.dropout_layer(
+              attention_values, deterministic=deterministic)
     attention_values = (inputs + attention_values)
     attention_values = self.attention_layer_norm(attention_values)
 

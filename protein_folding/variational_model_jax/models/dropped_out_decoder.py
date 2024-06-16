@@ -13,7 +13,7 @@ class VAE(nn.Module):
   conditioner_model: first_model.ConditionerModule
 
   def compute_model_loss(
-      self, random_key, training_data):
+      self, random_key, training_data, deterministic):
     conditioning = self.conditioner_model(training_data)
     mean_z, logvar_z = self.encoder_model(training_data)
     eps = random.normal(random_key, shape=jnp.shape(mean_z))
@@ -21,7 +21,8 @@ class VAE(nn.Module):
 
     mask = shared_utils.Mask(training_data)
     mean_val, log_prob_x_z = self.decoder_model.log_prob_x(
-        conditioning, z, mask, training_data['normalized_coordinates'])
+        conditioning, z, mask, training_data['normalized_coordinates'],
+        deterministic=deterministic)
     log_prob_z = shared_utils.LogNormalPdf(z, 0, 0)
     log_prob_z_x = shared_utils.LogNormalPdf(z, mean_z, logvar_z)
 
