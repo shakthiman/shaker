@@ -66,15 +66,15 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
         batch_size=batch_size,
         conv1=nn.Conv(features=num_conditioner_features+3,
                       kernel_size=3),
-        transformer2=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
-        transformer3=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
+        transformer2=nn.MultiHeadAttention(num_heads=8, qkv_features=8),
+        transformer3=nn.MultiHeadAttention(num_heads=8, qkv_features=8),
         feedforward_network=shared_modules.DNN(
-            dnn_layers=[nn.Dense(100) for i in range(5)],
+            dnn_layers=[nn.Dense(128) for i in range(5)],
             activation_function = nn.gelu
         ),
         final_layer=nn.Dense(num_conditioner_features),
         dropout_fraction=0.1
-    ) for i in range(10)],
+    ) for i in range(25)],
     initial_scale_value=1)
   return VAE(
       encoder_model=encoder_model,
