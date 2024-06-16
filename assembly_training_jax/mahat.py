@@ -12,7 +12,7 @@ import optax
 
 _INPUT_SIZE = 24000
 _BATCH_SIZE = 2
-_NUM_BLOCKS = 150
+_NUM_BLOCKS = 20
 
 def main ():
   client = storage.Client()

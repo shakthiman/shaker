@@ -60,12 +60,13 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic):
       + conditioner.residue_embedding_dims
       + conditioner.atom_embedding_dims)
   decoder_model = first_model.DecoderModule(
-      transformers=[shared_modules.EfficientTransformerUnit(
+      transformers=[shared_modules.EfficientTransformerUnit3(
         num_blocks=num_blocks,
         input_length=input_length,
         batch_size=batch_size,
-        local_transformer=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
-        global_transformer=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
+        transformer1=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
+        transformer2=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
+        transformer3=nn.MultiHeadAttention(num_heads=100, qkv_features=100),
         feedforward_network=shared_modules.DNN(
             dnn_layers=[nn.Dense(100) for i in range(5)],
             activation_function = nn.gelu
