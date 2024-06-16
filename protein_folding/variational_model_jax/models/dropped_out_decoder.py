@@ -34,6 +34,9 @@ class VAE(nn.Module):
         jnp.sum(log_prob_z*jnp.expand_dims(mask, -1), axis=[1,2]), axis=0)
     log_prob_z_x = jnp.mean(
         jnp.sum(log_prob_z_x*jnp.expand_dims(mask, -1), axis=[1,2]), axis=0)
+    diff_mae = shared_utils.DiffMAE(mean_val=mean_val,
+                                    training_data=training_data,
+                                    mask=mask)
     return loss_information.LossInformation(
             loss=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
             loss_beta_1=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
