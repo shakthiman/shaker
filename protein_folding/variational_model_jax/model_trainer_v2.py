@@ -37,7 +37,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
     return (loss_information.loss, loss_information)
 
   loss_and_grad_fn = jax.value_and_grad(
-      _LossFn, argnums=[0], has_aux=True)
+      _LossFn, argnums=0, has_aux=True)
 
   @functools.partial(jax.pmap, axis_name='batch', donate_argnums=(1,2))
   def TrainStep(random_key, vae_params, opt_state, training_data):
