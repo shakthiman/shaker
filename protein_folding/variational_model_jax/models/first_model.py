@@ -120,7 +120,7 @@ def ComputeLoss(random_key,
                                   training_data=training_data,
                                   mask=mask)
 
-  return loss_information.LossInformation(
+  return loss_information.CreateLossInformation(
       loss=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
       loss_beta_1=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
       logpx_z= log_prob_x_z,
