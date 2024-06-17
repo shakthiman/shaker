@@ -187,10 +187,18 @@ def Init(random_key, encoder, decoder, conditioner, batch_size, input_length):
   atom_names = random.randint(atom_names_key, (batch_size, input_length), 0, 10)
 
   encoder_key, conditioner_key, decoder_key = random.split(params_key, 3)
-  encoder_params = encoder.init(encoder_key, normalized_coordinates)
+
+  training_data = {
+      'peptide_indices': peptide_indices,
+      'atom_indices': atom_indices,
+      'residue_names': residue_names,
+      'atom_names': atom_names,
+      'normalized_coordinates': normalized_coordinates
+  }
+  encoder_params = encoder.init(encoder_key, training_data)
   decoder_params = decoder.init(
       decoder_key, conditioning, z, mask, normalized_coordinates,
       method=DecoderModule.log_prob_x)
   conditioner_params = conditioner.init(
-      conditioner_key, peptide_indices, atom_indices, residue_names, atom_names)
+      conditioner_key, training_data)
   return (encoder_params, conditioner_params, decoder_params)
