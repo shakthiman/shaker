@@ -9,6 +9,7 @@ from flax import linen as nn
 from jax import numpy as jnp
 from jax import random
 import jax
+import math
 
 class VAE(nn.Module):
   encoder_model: first_model.EncoderModule
@@ -42,12 +43,13 @@ class VAE(nn.Module):
     diff_mae = shared_utils.DiffMAE(mean_val=mean_val,
                                     training_data=training_data,
                                     mask=mask)
-    nearby_pairs = jnp.reshape(mean_val,
+    refactored_mean_val = jnp.reshape(mean_val,
                                [self.batch_size,
                                 self.input_length//self.nearby_size,
                                 self.nearby_size, 3])
     nearby_pairs = jnp.linalg.norm(
-        jnp.expand_dims(nearby_pairs, -3) - jnp.expand_dims(nearby_pairs, -2),
+        jnp.expand_dims(refactored_mean_val, -3) -
+        jnp.expand_dims(refactored_mean_val, -2),
         axis=-1)
     nearby_mask = jnp.reshape(mask,
                               [self.batch_size,
@@ -68,10 +70,15 @@ class VAE(nn.Module):
     num_hard_clashes = jnp.sum(
         is_hard_clash * nearby_mask,
         axis=(1, 2, 3))
-    is_soft_clash = jnp.less_equal(nearby_pairs, 3.55)
+
+    l1_nearby_pairs = jnp.linalg.norm(
+        jnp.expand_dims(refactored_mean_val, -3) -
+        jnp.expand_dims(refactored_mean_val, -2),
+        axis=-1, ord=1)
+    is_soft_clash = jnp.less_equal(l1_nearby_pairs, 3.55 * 3/math.sqrt(3))
     num_soft_clashes = jnp.sum(jnp.select(
         [jnp.logical_and(nearby_mask, is_soft_clash)],
-        [20*(3.55 - nearby_pairs)]), axis=(1, 2, 3))
+        [20*(3.55*3/math.sqrt(3) - l1_nearby_pairs)]), axis=(1, 2, 3))
 
     num_hard_clashes = jnp.mean(
         num_hard_clashes, axis=0)
