@@ -71,14 +71,13 @@ class VAE(nn.Module):
         is_hard_clash * nearby_mask,
         axis=(1, 2, 3))
 
-    l1_nearby_pairs = jnp.linalg.norm(
-        jnp.expand_dims(refactored_mean_val, -3) -
-        jnp.expand_dims(refactored_mean_val, -2),
-        axis=-1, ord=1)
-    is_soft_clash = jnp.less_equal(l1_nearby_pairs, 3.55 * 3/math.sqrt(3))
+    l2_nearby_pairs = jnp.sum(
+        jnp.square(jnp.expand_dims(refactored_mean_val, -3) - jnp.expand_dims(refactored_mean_val, -2)),
+        axis=-1)
+    is_soft_clash = jnp.less_equal(l2_nearby_pairs, jnp.square(3.55))
     num_soft_clashes = jnp.sum(jnp.select(
         [jnp.logical_and(nearby_mask, is_soft_clash)],
-        [20*(3.55*3/math.sqrt(3) - l1_nearby_pairs)]), axis=(1, 2, 3))
+        [20*(jnp.square(3.55) - l2_nearby_pairs)]), axis=(1, 2, 3))
 
     num_hard_clashes = jnp.mean(
         num_hard_clashes, axis=0)
