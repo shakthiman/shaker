@@ -13,7 +13,7 @@ def _IgnoreCondition(x):
             # Hack to ignore sequences with RNA.
             tf.math.equal(tf.math.reduce_min(peptide_shapes), 0),
             # Too many atoms
-            tf.math.greater(num_peptides * atoms_per_peptide, 24000)]))
+            tf.math.greater(num_peptides * atoms_per_peptide, 32768)]))
 
 def _PrepareTFDataset(filenames, files_to_take=1):
   return (
