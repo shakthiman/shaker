@@ -71,8 +71,9 @@ class VAE(nn.Module):
         is_hard_clash * nearby_mask,
         axis=(1, 2, 3))
 
+    is_soft_clash = jnp.less_equal(l2_nearby_pairs, jnp.square(3.5))
     num_soft_clashes = jnp.sum(jax.nn.sigmoid(20*(jnp.square(3.55)-l2_nearby_pairs))
-                               * nearby_mask, axis=(1, 2, 3))
+                               * nearby_mask * is_soft_clash, axis=(1, 2, 3))
 
     num_hard_clashes = jnp.mean(
         num_hard_clashes, axis=0)
