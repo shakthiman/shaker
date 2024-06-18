@@ -26,7 +26,7 @@ def main ():
                               cluster_shuffle_size=1000,
                               cluster_cycle_length=1000)
 
-  random_key = random.key(1)
+  random_key = random.key(2)
   vae = dropped_out_decoder.GetModel(
           batch_size=_BATCH_SIZE,
           input_length=_INPUT_SIZE,
@@ -45,6 +45,16 @@ def main ():
           batch_size=_BATCH_SIZE,
           input_length=_INPUT_SIZE)
   opt_state = optimizer.init(vae_params)
+  vae_params = model_loading.LoadModelV2(
+      storage_client=client,
+      bucket_name='variational_shaker_models',
+      blob_name='assembly_based_jax_mahat_fixed_loss/87000',
+      vae_params=vae_params)
+  opt_state = model_loading.LoadOptimizer(
+      storage_client=client,
+      bucket_name='variational_shaker_models',
+      blob_name='assembly_based_jax_mahat_fixed_loss/87000',
+      opt_state=opt_state)
 
   random_key, train_key = random.split(random_key, 2)
   model_trainer_v2.Train(
@@ -58,13 +68,13 @@ def main ():
     pdb_vocab=v,
     random_key=random_key,
     model_save_bucket='variational_shaker_models',
-    model_save_blob='assembly_based_jax_mahat_fixed_loss',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_mahat_fixed_loss',
+    model_save_blob='assembly_based_jax_mahat_fixed_loss2',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_mahat_fixed_loss2',
     vae=vae,
     optimizer=optimizer,
     vae_params=vae_params,
     opt_state=opt_state,
-    step=0)
+    step=87000)
 
 if __name__ == "__main__":
   main()
