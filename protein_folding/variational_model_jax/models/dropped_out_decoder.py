@@ -21,6 +21,22 @@ class VAE(nn.Module):
   alpha_carbon: int
   alpha_carbon_clash_weight: float
 
+  def sample_positions(
+      self, random_key, training_data):
+    # 1. Compute Conditioning Features.
+    conditioning = self.conditioner_model(training_data)
+
+    # 2. Sample Z.
+    mean_z, logvar_z = self.encoder_model(training_data)
+    eps = random.normal(random_key, shape=jnp.shape(mean_z))
+    z = eps * jnp.exp(logvar_z * 0.5) + mean_z
+
+    # 3. Compute Mean positions.
+    mask = shared_utils.Mask(training_data)
+    mean_val, _ = self.decoder_model.log_prob_x(
+        conditioning, z, mask, training_data['normalized_coordinates'])
+    return mean_val
+
   def compute_model_loss(
       self, random_key, training_data):
     conditioning = self.conditioner_model(training_data)
