@@ -94,7 +94,7 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
         tf.summary.scalar('num_soft_clashes',
                           loss_information.num_soft_clashes[0], step=step)
         tf.summary.scalar('grad_norm', grad_norm[0], step=step)
-    if step % 1000 == 0:
+    if step % 5000 == 0:
       model_loading.SaveModelV2(
               storage_client=storage_client,
               bucket_name=model_save_bucket,
