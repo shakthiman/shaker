@@ -14,14 +14,14 @@ def Clashes(mask, normalized_coordinates, training_data,
     compression = jnp.logical_and(single_batch_data['mask'],
                                   single_batch_data['is_alpha_carbon'])
     relevant_coordinates = jnp.compress(
-        single_batch_data['normalized_coordinates'], compression, axis=0)
+        compression, single_batch_data['normalized_coordinates'], axis=0)
     l2_distances = jnp.sum(
         jnp.square(jnp.expand_dims(relevant_coordinates, -2) -
                    jnp.expand_dims(relevant_coordinates, -3)),
         axis=-1)
 
     not_same_atom = jnp.arange(0, loss_params.input_length) 
-    not_same_atom = jnp.compress(not_same_atom, compression, axis=0)
+    not_same_atom = jnp.compress(compression, not_same_atom, axis=0)
     not_same_atom = jnp.not_equal(jnp.expand_dims(not_same_atom, -1),
                                   jnp.expand_dims(not_same_atom, -2))
 
