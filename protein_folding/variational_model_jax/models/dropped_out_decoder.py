@@ -3,6 +3,7 @@ from protein_folding.variational_model_jax import loss_information
 from protein_folding.variational_model_jax.models import first_model
 from protein_folding.variational_model_jax.models import shared_modules
 from protein_folding.variational_model_jax.models import shared_utils
+from protein_folding.variational_model_jax.models import auxilliary_losses
 
 from flax import linen as nn
 
@@ -59,49 +60,13 @@ class VAE(nn.Module):
     diff_mae = shared_utils.DiffMAE(mean_val=mean_val,
                                     training_data=training_data,
                                     mask=mask)
-    refactored_mean_val = jnp.reshape(mean_val,
-                               [self.batch_size,
-                                self.input_length//self.nearby_size,
-                                self.nearby_size, 3])
-    l2_nearby_pairs = jnp.sum(
-        jnp.square(jnp.expand_dims(refactored_mean_val, -3) -
-                   jnp.expand_dims(refactored_mean_val, -2)),
-        axis=-1)
-    nearby_mask = jnp.reshape(mask,
-                              [self.batch_size,
-                               self.input_length//self.nearby_size,
-                               self.nearby_size])
-    is_alpha_carbon = jnp.reshape(
-        jnp.equal(training_data['atom_names'], self.alpha_carbon),
-        [self.batch_size,
-         self.input_length//self.nearby_size,
-         self.nearby_size])
-    nearby_mask = jnp.logical_and(nearby_mask, is_alpha_carbon)
+    loss_params = auxilliary_losses.LossParams(
+            batch_size=self.batch_size,
+            input_length=self.input_length,
+            alpha_carbon=self.alpha_carbon)
+    clash_loss = auxilliary_losses.Clashes(mask, mean_val, training_data, loss_params)
 
-    nearby_mask = jnp.logical_and(
-        jnp.expand_dims(nearby_mask, -1),
-        jnp.expand_dims(nearby_mask, -2))
-
-    not_same_atom = jnp.arange(0, self.nearby_size)
-    not_same_atom = jnp.not_equal(jnp.expand_dims(not_same_atom, -1),
-                                  jnp.expand_dims(not_same_atom, -2))
-    not_same_atom = jnp.expand_dims(jnp.expand_dims(not_same_atom, 0), 0)
-    is_hard_clash = jnp.less_equal(l2_nearby_pairs, jnp.square(3.5))
-    num_hard_clashes = jnp.sum(
-        is_hard_clash * nearby_mask * not_same_atom,
-        axis=(1, 2, 3))
-
-    is_soft_clash = jnp.less_equal(l2_nearby_pairs, jnp.square(3.5))
-    num_soft_clashes = jnp.sum(jax.nn.sigmoid(20*(jnp.square(3.55)-l2_nearby_pairs))
-                               * nearby_mask * is_soft_clash * not_same_atom,
-                               axis=(1, 2, 3))
-
-    num_hard_clashes = jnp.mean(
-        num_hard_clashes, axis=0)
-    num_soft_clashes = jnp.mean(
-        num_soft_clashes, axis=0)
-    
-    loss_alpha_carbon_clash = self.alpha_carbon_clash_weight*num_soft_clashes
+    loss_alpha_carbon_clash = self.alpha_carbon_clash_weight*clash_loss.num_soft_clashes
     return loss_information.CreateLossInformation(
             loss=(-1*(log_prob_x_z + log_prob_z - log_prob_z_x)
                   + loss_alpha_carbon_clash),
@@ -111,8 +76,8 @@ class VAE(nn.Module):
             logqz_x=log_prob_z_x,
             diff_mae=diff_mae,
             loss_alpha_carbon_clash=loss_alpha_carbon_clash,
-            num_hard_clashes=num_hard_clashes,
-            num_soft_clashes=num_soft_clashes)
+            num_hard_clashes=clash_loss.num_hard_clashes,
+            num_soft_clashes=clash_loss.num_soft_clashes)
 
 def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
              alpha_carbon):
