@@ -3,7 +3,7 @@ import collections
 import jax
 from jax import numpy as jnp
 
-LossParams = colletions.namedtuple(
+LossParams = collections.namedtuple(
     'LossParams', ['batch_size', 'input_length', 'alpha_carbon'])
 
 ClashLoss = collections.namedtuple(
