@@ -24,7 +24,7 @@ def Clashes(mask, normalized_coordinates, training_data,
                      atom_idx+clash_params.nearby_size+1)
       neighborhood_mask = s_mask[first_idx:last_idx]
       neighborhood_normalized_coordinates = s_normalized_coordinates[
-          first_idx:last_idx,:],
+          first_idx:last_idx,:]
       neighborhood_is_alpha_carbon = s_is_alpha_carbon[
           first_idx:last_idx]
 
