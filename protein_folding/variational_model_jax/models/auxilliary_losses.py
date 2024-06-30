@@ -24,7 +24,7 @@ def Clashes(mask, normalized_coordinates, training_data,
                      atom_idx+clash_params.nearby_size+1)
       neighborhood_mask = s_mask[first_idx:last_idx]
       neighborhood_normalized_coordinates = s_normalized_coordinates[
-          first_idx:last_idx,:]
+          first_idx:last_idx,:],
       neighborhood_is_alpha_carbon = s_is_alpha_carbon[
           first_idx:last_idx]
 
@@ -35,17 +35,20 @@ def Clashes(mask, normalized_coordinates, training_data,
       is_hard_clash = jnp.less_equal(l2_distances, jnp.square(3.5))
       is_soft_clash = jnp.less_equal(l2_distances, jnp.square(3.6))
       num_hard_clashes= jnp.sum(jnp.where(
-          jnp.logical_and(s_mask[atom_idx],
-                          s_is_alpha_carbon[atom_idx],
-                          neighborhood_mask,
-                          neighborhood_is_alpha_carbon),
+          jnp.logical_and(
+            jnp.logical_and(s_mask[atom_idx],
+                            s_is_alpha_carbon[atom_idx]),
+            jn.logical_and(neighborhood_mask,
+                           neighborhood_is_alpha_carbon)),
           is_hard_clash, 0), axis=0)
       num_soft_clashes= jnp.sum(jnp.where(
-          jnp.logical_and(s_mask[atom_idx],
-                          s_is_alpha_carbon[atom_idx],
-                          neighborhood_mask,
-                          neighborhood_is_alpha_carbon,
-                          is_soft_clash),
+          jnp.logical_and(
+            jnp.logical_and(
+              jnp.logical_and(s_mask[atom_idx],
+                              s_is_alpha_carbon[atom_idx]),
+              jnp.logical_and(neighborhood_mask,
+                              neighborhood_is_alpha_carbon)),
+              is_soft_clash),
           jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances)), 0), axis=0)
       return (num_hard_clashes, num_soft_clashes)
     total_loss = (0, 0)
