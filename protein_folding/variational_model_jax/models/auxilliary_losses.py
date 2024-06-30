@@ -38,7 +38,7 @@ def Clashes(mask, normalized_coordinates, training_data,
           jnp.logical_and(
             jnp.logical_and(s_mask[atom_idx],
                             s_is_alpha_carbon[atom_idx]),
-            jn.logical_and(neighborhood_mask,
+            jnp.logical_and(neighborhood_mask,
                            neighborhood_is_alpha_carbon)),
           is_hard_clash, 0), axis=0)
       num_soft_clashes= jnp.sum(jnp.where(
