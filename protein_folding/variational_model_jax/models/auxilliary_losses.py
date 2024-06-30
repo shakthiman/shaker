@@ -52,7 +52,7 @@ def Clashes(mask, normalized_coordinates, training_data,
       return (t1[0]+t2[0], t1[1]+t2[1])
     return jax.lax.fori_loop(0, loss_params.input_length-1,
                              lambda i,a:_AddPair(_SingleAtomLoss(i), a),
-                             (0,0))
+                             (0,0), unroll=True)
   num_hard_clashes, num_soft_clashes = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
                          'normalized_coordinates': normalized_coordinates,
