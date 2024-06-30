@@ -45,16 +45,16 @@ def Clashes(mask, normalized_coordinates, training_data,
     is_soft_clash = jnp.less_equal(l2_distances, jnp.square(3.6))
     num_hard_clashes= jnp.sum(jnp.where(
       jnp.logical_and(
-        jnp.logical_and(s_mask,
-                        s_is_alpha_carbon),
+        jnp.expand_dims(jnp.logical_and(
+          s_mask, s_is_alpha_carbon), axis=1),
         jnp.logical_and(neighborhood_mask,
                         neighborhood_is_alpha_carbon)),
         is_hard_clash, 0), axis=[0,1])
     num_soft_clashes= jnp.sum(jnp.where(
       jnp.logical_and(
         jnp.logical_and(
-          jnp.logical_and(s_mask,
-                          s_is_alpha_carbon),
+          jnp.expand_dims(jnp.logical_and(
+            s_mask, s_is_alpha_carbon), axis=1),
           jnp.logical_and(neighborhood_mask,
                           neighborhood_is_alpha_carbon)),
           is_soft_clash),
