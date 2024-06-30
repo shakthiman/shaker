@@ -2,40 +2,57 @@ import collections
 
 import jax
 from jax import numpy as jnp
+from jax import scipy as jsp
 
 LossParams = collections.namedtuple(
     'LossParams', ['batch_size', 'input_length', 'alpha_carbon'])
+ClashParams = collections.namedtuple(
+    'ClashParams', ['nearby_size'])
 
 ClashLoss = collections.namedtuple(
     'ClashLoss', ['num_hard_clashes', 'num_soft_clashes'])
 def Clashes(mask, normalized_coordinates, training_data,
-            loss_params):
+            loss_params, clash_params):
   def _SingleBatchLoss(single_batch_data):
-    compression = jnp.logical_and(single_batch_data['mask'],
-                                  single_batch_data['is_alpha_carbon'])
-    relevant_coordinates = jnp.compress(
-        compression, single_batch_data['normalized_coordinates'], axis=0)
-    l2_distances = jnp.sum(
-        jnp.square(jnp.expand_dims(relevant_coordinates, -2) -
-                   jnp.expand_dims(relevant_coordinates, -3)),
-        axis=-1)
+    def _SingleAtomLoss(atom_idx):
+      s_mask = single_batch_data['mask']
+      s_normalized_coordinates = single_batch_data['normalized_coordinates']
+      s_is_alpha_carbon = single_batch_data['is_alpha_carbon']
 
-    not_same_atom = jnp.arange(0, loss_params.input_length) 
-    not_same_atom = jnp.compress(compression, not_same_atom, axis=0)
-    not_same_atom = jnp.not_equal(jnp.expand_dims(not_same_atom, -1),
-                                  jnp.expand_dims(not_same_atom, -2))
+      first_idx = min(loss_params.input_length-1,atom_idx+1)
+      last_idx = min(loss_params.input_length-1,
+                     atom_idx+clash_params.nearby_size+1)
+      neighborhood_mask = s_mask[first_idx:last_idx]
+      neighborhood_normalized_coordinates = s_normalized_coordinates[
+          first_idx:last_idx,:],
+      neighborhood_is_alpha_carbon = s_is_alpha_carbon[
+          first_idx:last_idx]
 
-    is_hard_clash = jnp.less_equal(l2_distances, jnp.square(3.5))
-    num_hard_clashes = jnp.sum(
-        is_hard_clash * not_same_atom,
-        axis=(0, 1))
-
-    is_soft_clash = jnp.less_equal(l2_distances, jnp.square(3.6))
-    num_soft_clashes = jnp.sum(jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances))
-                               * not_same_atom * is_soft_clash,
-                               axis=(0,1))
-    return (num_hard_clashes, num_soft_clashes)
-
+      my_coordinate = s_normalized_coordinates[atom_idx,:]
+      l2_distances = jnp.sum(jnp.square(
+        neighborhood_normalized_coordinates - my_coordinate),
+                             axis=-1)
+      is_hard_clash = jnp.less_equal(l2_distances, jnp.square(3.5))
+      is_soft_clash = jnp.less_equal(l2_distances, jnp.square(3.6))
+      num_hard_clashes= jnp.sum(jnp.where(
+          jnp.logical_and(s_mask[atom_idx],
+                          s_is_alpha_carbon[atom_idx]
+                          neighborhood_mask,
+                          neighborhood_is_alpha_carbon),
+          is_hard_clash, 0), axis=0)
+      num_soft_clashes= jnp.sum(jnp.where(
+          jnp.logical_and(s_mask[atom_idx],
+                          s_is_alpha_carbon[atom_idx]
+                          neighborhood_mask,
+                          neighborhood_is_alpha_carbon,
+                          is_soft_clash),
+          jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances)), 0), axis=0)
+      return (num_hard_clashes, num_soft_clashes)
+    def _AddPair(t1, t2):
+      return (t1[0]+t2[0], t1[1]+t2[1])
+    return jax.lax.fori_loop(0, loss_params.input_length-1,
+                             lambda i,a:_AddPair(_SingleAtomLoss(i), a),
+                             (0,0))
   num_hard_clashes, num_soft_clashes = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
                          'normalized_coordinates': normalized_coordinates,

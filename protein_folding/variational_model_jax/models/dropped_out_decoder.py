@@ -64,7 +64,9 @@ class VAE(nn.Module):
             batch_size=self.batch_size,
             input_length=self.input_length,
             alpha_carbon=self.alpha_carbon)
-    clash_loss = auxilliary_losses.Clashes(mask, mean_val, training_data, loss_params)
+    clash_loss = auxilliary_losses.Clashes(
+        mask, mean_val, training_data,
+        loss_params, auxilliary_losses.ClashParams(nearby_size=100))
 
     loss_alpha_carbon_clash = self.alpha_carbon_clash_weight*clash_loss.num_soft_clashes
     return loss_information.CreateLossInformation(
