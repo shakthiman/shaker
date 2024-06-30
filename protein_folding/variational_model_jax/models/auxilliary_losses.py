@@ -48,11 +48,12 @@ def Clashes(mask, normalized_coordinates, training_data,
                           is_soft_clash),
           jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances)), 0), axis=0)
       return (num_hard_clashes, num_soft_clashes)
-    def _AddPair(t1, t2):
-      return (t1[0]+t2[0], t1[1]+t2[1])
-    return jax.lax.fori_loop(0, loss_params.input_length-1,
-                             lambda i,a:_AddPair(_SingleAtomLoss(i), a),
-                             (0,0), unroll=True)
+    total_loss = (0, 0)
+    for i in range(loss_params.input_length-1):
+      sl = _SingleAtomLoss(i)
+      total_loss[0] = total_loss[0] + sl[0]
+      total_loss[1] = total_loss[1] + sl[1]
+    return total_loss
   num_hard_clashes, num_soft_clashes = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
                          'normalized_coordinates': normalized_coordinates,
