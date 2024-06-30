@@ -54,8 +54,8 @@ def Clashes(mask, normalized_coordinates, training_data,
     total_loss = (0, 0)
     for i in range(loss_params.input_length-1):
       sl = _SingleAtomLoss(i)
-      total_loss[0] = total_loss[0] + sl[0]
-      total_loss[1] = total_loss[1] + sl[1]
+      total_loss = (total_loss[0] + sl[0],
+                    total_loss[1] + sl[1])
     return total_loss
   num_hard_clashes, num_soft_clashes = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
