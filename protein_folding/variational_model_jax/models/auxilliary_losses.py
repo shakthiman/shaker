@@ -220,7 +220,7 @@ def DihedralLosses(mask, predicted_coordinates, training_data, loss_params,
          'is_carbon': jnp.equal(training_data['atom_names'],
                                 dihedral_params.carbon),
          'is_nitrogen': jnp.equal(training_data['atom_names'],
-                                dihedral_params.is_nitrogen)})
+                                dihedral_params.nitrogen)})
   return DihedralLoss(
       total_phi_error=jnp.mean(total_phi_error, axis=0),
       total_psi_error=jnp.mean(total_psi_error, axis=0),
