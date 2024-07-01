@@ -93,6 +93,20 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
                           loss_information.num_hard_clashes[0], step=step)
         tf.summary.scalar('num_soft_clashes',
                           loss_information.num_soft_clashes[0], step=step)
+        tf.summary.scalar('loss_dihedral_loss',
+                          loss_information.loss_dihedral_loss[0], step=step)
+        tf.summary.scalar('total_phi_error',
+                          loss_information.dihedral_loss.total_phi_error[0], step=step)
+        tf.summary.scalar('total_psi_error',
+                          loss_information.dihedral_loss.total_psi_error[0], step=step)
+        tf.summary.scalar('total_omega_error',
+                          loss_information.dihedral_loss.total_omega_error[0], step=step)
+        tf.summary.scalar('average_phi_error',
+                          loss_information.dihedral_loss.average_phi_error[0], step=step)
+        tf.summary.scalar('average_psi_error',
+                          loss_information.dihedral_loss.average_psi_error[0], step=step)
+        tf.summary.scalar('average_omega_error',
+                          loss_information.dihedral_loss.average_omega_error[0], step=step)
         tf.summary.scalar('grad_norm', grad_norm[0], step=step)
     if step % 5000 == 0:
       model_loading.SaveModelV2(
