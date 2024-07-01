@@ -161,7 +161,7 @@ def DihedralLosses(mask, predicted_coordinates, training_data, loss_params,
     def _ComputeAngle(coordinates):
       next_coordinates = [_2DShift(coordinates, num)
                           for num in range(1, dihedral_params.nearby_size)] 
-      next_coordinate = jnp.select(next_atom_match, coordinates)
+      next_coordinate = jnp.select(next_atom_match, next_coordinates)
       u1 = next_coordinate - coordinates
       # Shift the u_s to find u_2 and u_3
       next_us = [
