@@ -1,5 +1,5 @@
 import collections
-import auxilliary_losses
+from protein_folding.variational_model_jax.models import auxilliary_losses
 
 LossInformation = collections.namedtuple(
     'LossInformation', [
