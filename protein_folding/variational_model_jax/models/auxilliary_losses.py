@@ -174,11 +174,14 @@ def DihedralLosses(mask, predicted_coordinates, training_data, loss_params,
                        for a in u3_match], next_us)
       u1_u2_cross = _CrossProduct(u1, u2)
       u2_u3_cross = _CrossProduct(u2, u3)
-      angle = jnp.arctan2(
-          jnp.sum(u2*(_CrossProduct(u1_u2_cross, u2_u3_cross)),
-                  axis=1),
-          jnp.linalg.norm(u2, axis=1)*jnp.sum(
-            u1_u2_cross*u2_u3_cross, axis=1))
+      l = jnp.sum(
+          u2*(_CrossProduct(u1_u2_cross, u2_u3_cross)),
+          axis=1)
+      r = jnp.linalg.norm(u2, axis=1)*jnp.sum(
+          u1_u2_cross*u2_u3_cross, axis=1)
+      l = jnp.where(jnp.absolute(l)<1e-6, jnp.ones_like(l), l)
+      r = jnp.where(jnp.absolute(r)<1e-6, jnp.ones_like(r), r)
+      angle = jnp.arctan2(l, r)
       return angle
 
     angle_true = _ComputeAngle(s_true_normalized_coordinates)
