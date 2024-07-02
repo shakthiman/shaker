@@ -142,7 +142,7 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
       alpha_carbon_clash_weight=1e4,
       carbon=carbon,
       nitrogen=nitrogen,
-      dihedral_loss_weight=3.0)
+      dihedral_loss_weight=30.0)
 
 def Init(random_key, vae, batch_size, input_length):
   random_key, variables_key = random.split(random_key, 2)
