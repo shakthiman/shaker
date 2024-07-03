@@ -198,6 +198,8 @@ def DihedralLosses(mask, predicted_coordinates, training_data, loss_params,
         current_atom_is_eligible, s_is_alpha_carbon)
 
     angle_error = jnp.mod(angle_true-angle_predicted + 2*jnp.pi, 2*jnp.pi)
+    angle_error_rev  = jnp.mod(angle_predicted-angle_true + 2*jnp.pi, 2*jnp.pi)
+    angle_error = jnp.minimum(angle_error, angle_error_rev)
     total_phi_error = jnp.sum(
         jnp.where(current_atom_is_phi, angle_error, 0),
         axis=0)
