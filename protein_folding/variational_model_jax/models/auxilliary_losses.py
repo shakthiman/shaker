@@ -73,7 +73,7 @@ def Clashes(mask, normalized_coordinates, training_data,
                                                       loss_params.alpha_carbon)})
   return ClashLoss(num_hard_clashes=jnp.mean(num_hard_clashes, axis=0),
                    num_soft_clashes=jnp.mean(num_soft_clashes, axis=0),
-                   sum_squares=sum_squares)
+                   sum_squares=jnp.mean(sum_squares, axis=0))
 
 DihedralParams = collections.namedtuple(
     'DihedralParams', ['carbon', 'nitrogen', 'nearby_size'])
