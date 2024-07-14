@@ -5,12 +5,12 @@ LossInformation = collections.namedtuple(
     'LossInformation', [
       'loss', 'loss_beta_1', 'logpx_z', 'logpz', 'logqz_x', 'diff_mae',
       'loss_alpha_carbon_clash', 'num_hard_clashes', 'num_soft_clashes',
-      'loss_dihedral_loss', 'dihedral_loss'])
+      'clash_sum_squares', 'loss_dihedral_loss', 'dihedral_loss'])
 
 def CreateLossInformation(
     loss, loss_beta_1, logpx_z, logpz, logqz_x, diff_mae,
     loss_alpha_carbon_clash=0, num_hard_clashes=0, num_soft_clashes=0,
-    loss_dihedral_loss=0.0, dihedral_loss=auxilliary_losses.DihedralLoss(
+    clash_sum_squares=0, loss_dihedral_loss=0.0, dihedral_loss=auxilliary_losses.DihedralLoss(
         total_phi_error=0.0,
         total_psi_error=0.0,
         total_omega_error=0.0,
@@ -27,5 +27,6 @@ def CreateLossInformation(
       loss_alpha_carbon_clash=loss_alpha_carbon_clash,
       num_hard_clashes=num_hard_clashes,
       num_soft_clashes=num_soft_clashes,
+      clash_sum_squares=clash_sum_squares,
       loss_dihedral_loss=loss_dihedral_loss,
       dihedral_loss=dihedral_loss)

@@ -79,7 +79,7 @@ class VAE(nn.Module):
           nitrogen=self.nitrogen,
           nearby_size=128))
 
-    loss_alpha_carbon_clash = self.alpha_carbon_clash_weight * clash_loss.num_soft_clashes
+    loss_alpha_carbon_clash = self.alpha_carbon_clash_weight * clash_loss.sum_squares
     loss_dihedral_loss = self.dihedral_loss_weight * (
         dihedral_loss.total_phi_error +
         dihedral_loss.total_psi_error +
@@ -95,6 +95,7 @@ class VAE(nn.Module):
             loss_alpha_carbon_clash=loss_alpha_carbon_clash,
             num_hard_clashes=clash_loss.num_hard_clashes,
             num_soft_clashes=clash_loss.num_soft_clashes,
+            clash_sum_squares=clash_loss.sum_squares,
             loss_dihedral_loss=loss_dihedral_loss,
             dihedral_loss=dihedral_loss)
 
@@ -139,7 +140,7 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
       input_length=input_length,
       nearby_size=num_blocks,
       alpha_carbon=alpha_carbon,
-      alpha_carbon_clash_weight=1e4,
+      alpha_carbon_clash_weight=700,
       carbon=carbon,
       nitrogen=nitrogen,
       dihedral_loss_weight=75.0)

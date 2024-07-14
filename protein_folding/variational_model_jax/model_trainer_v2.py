@@ -93,6 +93,8 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
                           loss_information.num_hard_clashes[0], step=step)
         tf.summary.scalar('num_soft_clashes',
                           loss_information.num_soft_clashes[0], step=step)
+        tf.summary.scalar('clash_sum_squares',
+                          loss_information.clash_sum_squares[0], step=step)
         tf.summary.scalar('loss_dihedral_loss',
                           loss_information.loss_dihedral_loss[0], step=step)
         tf.summary.scalar('total_phi_error',

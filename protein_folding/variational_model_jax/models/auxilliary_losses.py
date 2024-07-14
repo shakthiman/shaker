@@ -10,7 +10,7 @@ ClashParams = collections.namedtuple(
     'ClashParams', ['nearby_size'])
 
 ClashLoss = collections.namedtuple(
-    'ClashLoss', ['num_hard_clashes', 'num_soft_clashes'])
+    'ClashLoss', ['num_hard_clashes', 'num_soft_clashes', 'sum_squares'])
 def Clashes(mask, normalized_coordinates, training_data,
             loss_params, clash_params):
   def _SingleBatchLoss(single_batch_data):
@@ -43,6 +43,7 @@ def Clashes(mask, normalized_coordinates, training_data,
                              axis=-1)
     is_hard_clash = jnp.less_equal(l2_distances, jnp.square(3.5))
     is_soft_clash = jnp.less_equal(l2_distances, jnp.square(3.6))
+
     num_hard_clashes= jnp.sum(jnp.where(
       jnp.logical_and(
         jnp.expand_dims(jnp.logical_and(
@@ -50,23 +51,29 @@ def Clashes(mask, normalized_coordinates, training_data,
         jnp.logical_and(neighborhood_mask,
                         neighborhood_is_alpha_carbon)),
         is_hard_clash, 0), axis=[0,1])
-    num_soft_clashes= jnp.sum(jnp.where(
-      jnp.logical_and(
+
+    soft_clash_condition = jnp.logical_and(
         jnp.logical_and(
           jnp.expand_dims(jnp.logical_and(
             s_mask, s_is_alpha_carbon), axis=1),
           jnp.logical_and(neighborhood_mask,
                           neighborhood_is_alpha_carbon)),
-          is_soft_clash),
+          is_soft_clash)
+    num_soft_clashes= jnp.sum(jnp.where(
+      soft_clash_condition,
       jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances)), 0), axis=[0,1])
-    return (num_hard_clashes, num_soft_clashes)
-  num_hard_clashes, num_soft_clashes = jax.lax.map(
+    sum_squares = jnp.sum(jnp.where(
+      soft_clash_condition,
+      jnp.square(3.55) - l2_distances), axis=[0,1])
+    return (num_hard_clashes, num_soft_clashes, sum_squares)
+  num_hard_clashes, num_soft_clashes, sum_squares = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
                          'normalized_coordinates': normalized_coordinates,
                          'is_alpha_carbon': jnp.equal(training_data['atom_names'],
                                                       loss_params.alpha_carbon)})
   return ClashLoss(num_hard_clashes=jnp.mean(num_hard_clashes, axis=0),
-                   num_soft_clashes=jnp.mean(num_soft_clashes, axis=0))
+                   num_soft_clashes=jnp.mean(num_soft_clashes, axis=0),
+                   sum_squares=sum_squares)
 
 DihedralParams = collections.namedtuple(
     'DihedralParams', ['carbon', 'nitrogen', 'nearby_size'])
