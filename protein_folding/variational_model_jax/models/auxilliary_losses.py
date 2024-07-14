@@ -64,7 +64,7 @@ def Clashes(mask, normalized_coordinates, training_data,
       jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances)), 0), axis=[0,1])
     sum_squares = jnp.sum(jnp.where(
       soft_clash_condition,
-      jnp.square(3.55) - l2_distances), axis=[0,1])
+      jnp.square(3.55) - l2_distances, jnp.square(3.55)-jnp.square(3.6)), axis=[0,1])
     return (num_hard_clashes, num_soft_clashes, sum_squares)
   num_hard_clashes, num_soft_clashes, sum_squares = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
