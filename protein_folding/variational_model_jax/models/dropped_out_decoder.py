@@ -140,7 +140,7 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
       input_length=input_length,
       nearby_size=num_blocks,
       alpha_carbon=alpha_carbon,
-      alpha_carbon_clash_weight=700,
+      alpha_carbon_clash_weight=70,
       carbon=carbon,
       nitrogen=nitrogen,
       dihedral_loss_weight=75.0)
