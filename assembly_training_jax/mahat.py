@@ -52,12 +52,12 @@ def main ():
   vae_params = model_loading.LoadModelV2(
       storage_client=client,
       bucket_name='variational_shaker_models',
-      blob_name='assembly_based_jax_mahat_lower_clash_loss5/375000',
+      blob_name='assembly_based_jax_mahat_lower_clash_loss4/375000',
       vae_params=vae_params)
   opt_state = model_loading.LoadOptimizer(
       storage_client=client,
       bucket_name='variational_shaker_models',
-      blob_name='assembly_based_jax_mahat_lower_clash_loss5/375000',
+      blob_name='assembly_based_jax_mahat_lower_clash_loss4/375000',
       opt_state=opt_state)
 
   random_key, train_key = random.split(random_key, 2)
@@ -72,8 +72,8 @@ def main ():
     pdb_vocab=v,
     random_key=random_key,
     model_save_bucket='variational_shaker_models',
-    model_save_blob='assembly_based_jax_mahat_lower_clash_loss6',
-    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_mahat_lower_clash_loss6',
+    model_save_blob='assembly_based_jax_mahat_lower_clash_loss5',
+    tensorboard_target='gs://variational_shaker_models/tensorboard/assembly_based_jax_mahat_lower_clash_loss5',
     vae=vae,
     optimizer=optimizer,
     vae_params=vae_params,
