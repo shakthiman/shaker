@@ -316,7 +316,7 @@ def DistanceMatrix(mask, predicted_coordinates, training_data, loss_params,
           jnp.abs(
             jnp.sqrt(true_distance_matrix)
             - jnp.sqrt(predicted_distance_matrix)),
-          0)
+          0),
         axis=[0,1])
     total_entries_considered = jnp.sum(
         should_consider_entry, axis=[0,1])
