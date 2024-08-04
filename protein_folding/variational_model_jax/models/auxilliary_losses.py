@@ -296,7 +296,7 @@ def DistanceMatrix(mask, predicted_coordinates, training_data, loss_params,
     should_consider_atom = jnp.logical_and(s_mask, s_is_alpha_carbon)
     should_consider_neighbor = jnp.concatenate([
       jnp.expand_dims(_1DShift(should_consider_atom, num), axis=1)
-      for num in range(1, distance_matrix_params.nearby_size)])
+      for num in range(1, distance_matrix_params.nearby_size)], axis=1)
     should_consider_entry = jnp.logical_and(
         jnp.expand_dims(should_consider_atom, axis=1),
         should_consider_neighbor)
