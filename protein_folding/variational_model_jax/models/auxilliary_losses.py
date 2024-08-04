@@ -327,7 +327,8 @@ def DistanceMatrix(mask, predicted_coordinates, training_data, loss_params,
         'mask': mask,
         'normalized_coordinates': training_data['normalized_coordinates'],
         'predicted_coordinates': predicted_coordinates,
-        'is_alpha_carbon'})
+        'is_alpha_carbon': jnp.equal(training_data['atom_names'],
+                                     loss_params.alpha_carbon)})
   return DistanceMatrixLoss(
           alpha_carbon_squared_distances_loss=jnp.mean(squared_distance_loss, axis=0),
           alpha_carbon_avg_distance_error=jnp.mean(avg_distance_error, axis=0))
