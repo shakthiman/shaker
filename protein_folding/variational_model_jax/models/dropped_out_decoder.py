@@ -57,6 +57,9 @@ class VAE(nn.Module):
   nitrogen:int
   dihedral_loss_weight:float
 
+  gyration_diff_weight: float
+  distance_matrix_diff_weight: float
+
 
   def sample_positions(
       self, random_key, training_data):
@@ -120,9 +123,19 @@ class VAE(nn.Module):
         dihedral_loss.total_phi_error +
         dihedral_loss.total_psi_error +
         dihedral_loss.total_omega_error)
+    loss_gyration_loss = (
+            self.gyration_diff_weight *
+            radius_of_gyration_loss
+            .alpha_carbon_only_radius_of_gyration_squared_diff)
+    loss_distance_matrix_loss = (
+            self.distance_matrix_diff_weight *
+            distance_matrix_loss.alpha_carbon_squared_distances_loss)
+
     return loss_information.CreateLossInformation(
             loss=(-1*(log_prob_x_z + log_prob_z - log_prob_z_x)
-                  + loss_alpha_carbon_clash + loss_dihedral_loss),
+                  + loss_alpha_carbon_clash + loss_dihedral_loss
+                  + loss_gyration_loss
+                  + loss_distance_matrix_loss),
             loss_beta_1=-1*(log_prob_x_z + log_prob_z - log_prob_z_x),
             logpx_z= log_prob_x_z,
             logpz = log_prob_z,
@@ -134,7 +147,9 @@ class VAE(nn.Module):
             clash_sum_squares=clash_loss.sum_squares,
             loss_dihedral_loss=loss_dihedral_loss,
             dihedral_loss=dihedral_loss,
+            loss_gyration_loss=loss_gyration_loss,
             radius_of_gyration_loss=radius_of_gyration_loss,
+            loss_distance_matrix_loss=loss_distance_matrix_loss,
             distance_matrix_loss=distance_matrix_loss)
 
 def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
@@ -181,7 +196,9 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
       alpha_carbon_clash_weight=70,
       carbon=carbon,
       nitrogen=nitrogen,
-      dihedral_loss_weight=75.0)
+      dihedral_loss_weight=75.0,
+      gyration_diff_weight=1000,
+      distance_matrix_diff_weight=0.1)
 
 def Init(random_key, vae, batch_size, input_length):
   random_key, variables_key = random.split(random_key, 2)

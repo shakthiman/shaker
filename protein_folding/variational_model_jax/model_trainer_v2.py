@@ -109,6 +109,8 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
                           loss_information.dihedral_loss.average_psi_error[0], step=step)
         tf.summary.scalar('average_omega_error',
                           loss_information.dihedral_loss.average_omega_error[0], step=step)
+        tf.summary.scalar('loss_gyration_loss',
+                          loss_information.loss_gyration_loss[0], step=step)
         tf.summary.scalar(
             'alpha_carbon_only_radius_of_gyration_diff',
             loss_information
@@ -121,6 +123,8 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
             .radius_of_gyration_loss
             .alpha_carbon_only_radius_of_gyration_squared_diff[0],
             step=step)
+        tf.summary.scalar('loss_distance_matrix_loss',
+                          loss_information.loss_distance_matrix_loss[0], step=step)
         tf.summary.scalar(
             'alpha_carbon_squared_distances_loss',
             loss_information
