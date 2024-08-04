@@ -9,6 +9,7 @@ from flax import linen as nn
 
 from jax import numpy as jnp
 from jax import random
+from jax import scipy as jscipy
 import jax
 import math
 
