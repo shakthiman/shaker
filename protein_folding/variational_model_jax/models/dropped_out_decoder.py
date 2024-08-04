@@ -12,9 +12,39 @@ from jax import random
 import jax
 import math
 
+import typing
+
+# Different from the first_model because it normalizes inputs.
+class DecoderModule(nn.Module):
+  transformers: typing.List[shared_modules.EfficientTransformerUnit]
+  initial_scale_value: float
+
+  def setup(self):
+    self.final_layer = nn.Dense(3)
+    self.scale = self.param('scale',
+                            nn.initializers.constant(self.initial_scale_value),
+                            [])
+    self.embedding_normalization_layer = nn.LayerNorm(reduction_axes=[-2, -1],
+                                                      feature_axes=[-2, -1])
+
+  def log_prob_x(self, conditioning, latent_embeddings, mask,
+                 normalized_coordinates):
+    mean_val = self.mean_prediction(conditioning, latent_embeddings, mask)
+    return (mean_val,
+            jscipy.stats.norm.logpdf(
+                normalized_coordinates, mean_val, self.scale))
+
+  def mean_prediction(self, conditioning, latent_embeddings, mask):
+    o = conditioning
+    normalized_latent_embeddings = self.embedding_normalization_layer(latent_embeddings)
+    for t in self.transformers:
+      o = t(jnp.concatenate([o, normalized_latent_embeddings], axis=-1), mask)
+    return self.final_layer(
+        jnp.concatenate([o, normalized_latent_embeddings], axis=-1))
+
 class VAE(nn.Module):
   encoder_model: first_model.EncoderModule
-  decoder_model: first_model.DecoderModule
+  decoder_model: DecoderModule
   conditioner_model: first_model.ConditionerModule
   batch_size: int
   input_length: int
@@ -78,6 +108,11 @@ class VAE(nn.Module):
           carbon=self.carbon,
           nitrogen=self.nitrogen,
           nearby_size=128))
+    radius_of_gyration_loss = auxilliary_losses.RadiusOfGyration(
+        mask, mean_val, training_data, loss_params)
+    distance_matrix_loss = auxilliary_losses.DistanceMatrix(
+        mask, mean_val, training_data, loss_params,
+        auxilliary_losses.DistanceMatrixParams(nearby_size=128))
 
     loss_alpha_carbon_clash = self.alpha_carbon_clash_weight * clash_loss.sum_squares
     loss_dihedral_loss = self.dihedral_loss_weight * (
@@ -97,7 +132,9 @@ class VAE(nn.Module):
             num_soft_clashes=clash_loss.num_soft_clashes,
             clash_sum_squares=clash_loss.sum_squares,
             loss_dihedral_loss=loss_dihedral_loss,
-            dihedral_loss=dihedral_loss)
+            dihedral_loss=dihedral_loss,
+            radius_of_gyration_loss=radius_of_gyration_loss,
+            distance_matrix_loss=distance_matrix_loss)
 
 def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
              alpha_carbon, carbon, nitrogen):
@@ -115,7 +152,7 @@ def GetModel(batch_size, input_length, num_blocks, pdb_vocab, deterministic,
       + conditioner.amino_acid_embedding_dims
       + conditioner.residue_embedding_dims
       + conditioner.atom_embedding_dims)
-  decoder_model = first_model.DecoderModule(
+  decoder_model = DecoderModule(
       transformers=[shared_modules.EfficientTransformerUnit3(
         num_blocks=num_blocks,
         input_length=input_length,

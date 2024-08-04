@@ -109,6 +109,30 @@ def Train(storage_client, ds, shuffle_size, batch_size, input_size,
                           loss_information.dihedral_loss.average_psi_error[0], step=step)
         tf.summary.scalar('average_omega_error',
                           loss_information.dihedral_loss.average_omega_error[0], step=step)
+        tf.summary.scalar(
+            'alpha_carbon_only_radius_of_gyration_diff',
+            loss_information
+            .radius_of_gyration_loss
+            .alpha_carbon_only_radius_of_gyration_diff[0],
+            step=step)
+        tf.summary.scalar(
+            'alpha_carbon_only_radius_of_gyration_squared_diff',
+            loss_information
+            .radius_of_gyration_loss
+            .alpha_carbon_only_radius_of_gyration_squared_diff[0],
+            step=step)
+        tf.summary.scalar(
+            'alpha_carbon_squared_distances_loss',
+            loss_information
+            .distance_matrix_loss
+            .alpha_carbon_squared_distances_loss[0],
+            step=step)
+        tf.summary.scalar(
+            'alpha_carbon_avg_distance_error',
+            loss_information
+            .distance_matrix_loss
+            .alpha_carbon_avg_distance_error[0],
+            step=step)
         tf.summary.scalar('grad_norm', grad_norm[0], step=step)
     if step % 5000 == 0:
       model_loading.SaveModelV2(

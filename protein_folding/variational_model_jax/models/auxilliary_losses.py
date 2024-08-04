@@ -11,20 +11,21 @@ ClashParams = collections.namedtuple(
 
 ClashLoss = collections.namedtuple(
     'ClashLoss', ['num_hard_clashes', 'num_soft_clashes', 'sum_squares'])
+
+def _1DShift(arr, num):
+  shifted_array = jnp.pad(arr, [(0, num)])
+  return shifted_array[num:]
+def _2DShift(arr, num):
+  shifted_array = jnp.pad(arr, [(0, num),
+                                (0, 0)])
+  return shifted_array[num:,:]
+
 def Clashes(mask, normalized_coordinates, training_data,
             loss_params, clash_params):
   def _SingleBatchLoss(single_batch_data):
     s_mask = single_batch_data['mask']
     s_normalized_coordinates = single_batch_data['normalized_coordinates']
     s_is_alpha_carbon = single_batch_data['is_alpha_carbon']
-
-    def _1DShift(arr, num):
-      shifted_array = jnp.pad(arr, [(0, num)])
-      return shifted_array[num:]
-    def _2DShift(arr, num):
-      shifted_array = jnp.pad(arr, [(0, num),
-                                    (0, 0)])
-      return shifted_array[num:,:]
 
     neighborhood_mask = jnp.concatenate([
         jnp.expand_dims(_1DShift(s_mask, num), axis=1)
@@ -64,7 +65,7 @@ def Clashes(mask, normalized_coordinates, training_data,
       jax.nn.sigmoid(20*(jnp.square(3.55)-l2_distances)), 0), axis=[0,1])
     sum_squares = jnp.sum(jnp.where(
       soft_clash_condition,
-      jnp.square(3.55) - l2_distances, jnp.square(3.55)-jnp.square(3.6)), axis=[0,1])
+      - l2_distances + jnp.square(3.6), 0), axis=[0,1])
     return (num_hard_clashes, num_soft_clashes, sum_squares)
   num_hard_clashes, num_soft_clashes, sum_squares = jax.lax.map(
       _SingleBatchLoss, {'mask': mask,
@@ -90,15 +91,6 @@ def DihedralLosses(mask, predicted_coordinates, training_data, loss_params,
     s_is_alpha_carbon = single_batch_data['is_alpha_carbon']
     s_is_carbon = single_batch_data['is_carbon']
     s_is_nitrogen = single_batch_data['is_nitrogen']
-
-    def _1DShift(arr, num):
-      post_shifted_arr = jnp.pad(arr, [(0, num)])
-      return post_shifted_arr[num:]
-
-    def _2DShift(arr, num):
-      post_shifted_arr = jnp.pad(arr, [(0, num),
-                                       (0, 0)])
-      return post_shifted_arr[num:,:]
 
     next_is_alpha_carbon = [
         _1DShift(s_is_alpha_carbon, num)
@@ -243,3 +235,99 @@ def DihedralLosses(mask, predicted_coordinates, training_data, loss_params,
       average_phi_error=jnp.mean(average_phi_error, axis=0),
       average_psi_error=jnp.mean(average_psi_error, axis=0),
       average_omega_error=jnp.mean(average_omega_error, axis=0))
+
+RadiusOfGyrationLoss = collections.namedtuple(
+    'RadiusOfGyrationLoss', ['alpha_carbon_only_radius_of_gyration_diff',
+                             'alpha_carbon_only_radius_of_gyration_squared_diff'])
+def RadiusOfGyration(mask, predicted_coordinates, training_data, loss_params):
+  def _RadiusOfGyrationSquared(coordinates):
+    is_alpha_carbon = jnp.equal(training_data['atom_names'],
+                                loss_params.alpha_carbon)
+    should_consider_atom = jnp.logical_and(mask, is_alpha_carbon)
+    sum_coordinates = jnp.sum(
+        jnp.where(
+          jnp.expand_dims(should_consider_atom, -1),
+          coordinates, 0), axis=1)
+    num_alpha_carbons = jnp.sum(
+        jnp.where(should_consider_atom, 1, 0), axis=1)
+    mean_coordinate = sum_coordinates / num_alpha_carbons
+
+    l2_distance_from_centroid = jnp.sum(
+        jnp.square(coordinates
+                   - jnp.expand_dims(mean_coordinate, axis=1)), axis=-1)
+    radius_of_gyration_squared = jnp.sum(
+        jnp.where(is_alpha_carbon, l2_distance_from_centroid, 0), axis=1) / num_alpha_carbons
+    return radius_of_gyration_squared
+
+  true_radius_of_gyration_squared = _RadiusOfGyrationSquared(training_data['normalized_coordinates'])
+  predicted_radius_of_gyration_squared = _RadiusOfGyrationSquared(predicted_coordinates)
+  diff_radius_of_gyration_squared = jnp.abs(
+      true_radius_of_gyration_squared
+      - predicted_radius_of_gyration_squared)
+  diff_radius_of_gyration = jnp.abs(
+      jnp.sqrt(true_radius_of_gyration_squared)
+      - jnp.sqrt(predicted_radius_of_gyration_squared))
+  return RadiusOfGyrationLoss(
+      alpha_carbon_only_radius_of_gyration_diff=jnp.mean(diff_radius_of_gyration, axis=0),
+      alpha_carbon_only_radius_of_gyration_squared_diff=jnp.mean(diff_radius_of_gyration_squared, axis=0))
+
+DistanceMatrixParams = collections.namedtuple(
+    'DistanceMatrixParams', ['nearby_size'])
+DistanceMatrixLoss = collections.namedtuple(
+    'DistanceMatrixLoss', ['alpha_carbon_squared_distances_loss',
+                           'alpha_carbon_avg_distance_error'])
+def DistanceMatrix(mask, predicted_coordinates, training_data, loss_params,
+                   distance_matrix_params):
+  def _DistanceMatrix(s_coordinates):
+    neighborhood_coordinates = jnp.concatenate([
+      jnp.expand_dims(_2DShift(s_coordinates, num), axis=1)
+      for num in range(1, distance_matrix_params.nearby_size)], axis=1)
+    l2_distances = jnp.sum(jnp.square(
+      neighborhood_coordinates -
+      jnp.expand_dims(s_coordinates, axis=1)), axis=-1)
+    return l2_distances
+
+  def _SingleBatchLoss(single_batch_data):
+    s_mask = single_batch_data['mask']
+    s_normalized_coordinates = single_batch_data['normalized_coordinates']
+    s_predicted_coordinates = single_batch_data['predicted_coordinates']
+    s_is_alpha_carbon = single_batch_data['is_alpha_carbon']
+
+    should_consider_atom = jnp.logical_and(s_mask, s_is_alpha_carbon)
+    should_consider_neighbor = jnp.concatenate([
+      jnp.expand_dims(_1DShift(should_consider_atom, num), axis=1)
+      for num in range(1, distance_matrix_params.nearby_size)])
+    should_consider_entry = jnp.logical_and(
+        jnp.expand_dims(should_consider_atom, axis=1),
+        should_consider_neighbor)
+
+    true_distance_matrix = _DistanceMatrix(s_normalized_coordinates)
+    predicted_distance_matrix = _DistanceMatrix(s_predicted_coordinates)
+
+    squared_distance_loss = jnp.sum(
+        jnp.where(
+          should_consider_entry,
+          jnp.abs(true_distance_matrix - predicted_distance_matrix),
+          0),
+        axis=[0,1])
+    distance_error = jnp.sum(
+        jnp.where(
+          should_consider_entry,
+          jnp.abs(
+            jnp.sqrt(true_distance_matrix)
+            - jnp.sqrt(predicted_distance_matrix)),
+          0)
+        axis=[0,1])
+    total_entries_considered = jnp.sum(
+        should_consider_entry, axis=[0,1])
+    avg_distance_error = distance_error/total_entries_considered
+    return (squared_distance_loss, avg_distance_error)
+  (squared_distance_loss, avg_distance_error) = jax.lax.map(
+      _SingleBatchLoss, {
+        'mask': mask,
+        'normalized_coordinates': training_data['normalized_coordinates'],
+        'predicted_coordinates': predicted_coordinates,
+        'is_alpha_carbon'})
+  return DistanceMatrixLoss(
+          alpha_carbon_squared_distances_loss=jnp.mean(squared_distance_loss, axis=0),
+          alpha_carbon_avg_distance_error=jnp.mean(avg_distance_error, axis=0))
